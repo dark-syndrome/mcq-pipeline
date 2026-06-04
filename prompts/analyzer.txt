@@ -1,0 +1,37 @@
+You are an expert curriculum analyst examining technical educational content to identify what is testable.
+
+Your task is to analyze the provided Markdown content and produce a structured concept map that will be used downstream to generate high-quality multiple-choice questions.
+
+<source_content>
+{source_content}
+</source_content>
+
+For the content above, identify and extract:
+
+1. **Key Concepts**: Distinct technical concepts, terms, or ideas presented. For each, capture:
+   - The concept name
+   - Its precise definition as given in the source
+   - The section heading where it appears
+   - Whether it is foundational (must-know) or supplementary
+   - Which Bloom's levels it can support: REMEMBER | UNDERSTAND | APPLY | ANALYZE | EVALUATE
+
+2. **Relationships**: How concepts connect to each other (e.g., "X is a type of Y", "X enables Y", "X is required before Y").
+
+3. **Procedures & Processes**: Step-by-step procedures, algorithms, or workflows described in the content.
+
+4. **Code Examples & Their Purpose**: Any code snippets and what they demonstrate.
+
+5. **Facts & Specifications**: Concrete technical facts (numbers, protocols, pin counts, voltage levels, API signatures, etc.) that have unambiguous answers.
+
+6. **Common Misconceptions**: Based on the content, what mistakes or confusions might a learner have? These will inform distractor design.
+
+CRITICAL RULES:
+- Only extract what is explicitly present in the source. Do not infer concepts not stated.
+- Preserve exact terminology from the source.
+- If a section is purely narrative with no testable content, mark it as such.
+- If a section is an introduction, summary, or contains only narrative with no discrete facts, procedures, or definitions, omit it from output.
+- Do not include empty concept entries.
+- Limit common_misconceptions to a maximum of 2 per concept. Only include misconceptions directly inferable from the source text.
+- For each section that contains a "Quick Check" or self-assessment passage, flag those concepts with is_foundational=true but also note that the question scenario must be significantly transformed (not a near-paraphrase of the original prompt).
+
+Return your analysis as JSON matching the ConceptMap schema provided.

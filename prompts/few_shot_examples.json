@@ -1,0 +1,1339 @@
+[
+  {
+    "_comment": "Q1 — Bloom: Analyze. Debugging ros2 topic echo producing no output.",
+    "question": "A developer runs the following command in a terminal:\n\n```bash\nros2 topic echo /cmd_vel\n```\n\nThe terminal shows no output and no error, and the robot is not moving. Which of the following is the most accurate interpretation of this observation?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The /cmd_vel topic does not exist in the ROS 2 graph.",
+        "is_correct": false,
+        "distractor_rationale": "A non-existent topic causes ros2 topic echo to print an explicit 'topic not found' error, not silent waiting."
+      },
+      {
+        "label": "B",
+        "text": "No node is currently publishing messages to /cmd_vel.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The topic exists, but is using an incompatible message type.",
+        "is_correct": false,
+        "distractor_rationale": "A type mismatch causes a deserialization error, not silent waiting with no output."
+      },
+      {
+        "label": "D",
+        "text": "The ros2 topic echo command requires sudo privileges to subscribe.",
+        "is_correct": false,
+        "distractor_rationale": "ROS 2 CLI tools do not require elevated privileges for topic subscription."
+      }
+    ],
+    "explanation": "When a topic exists but has no active publisher, ros2 topic echo connects silently and waits — it prints nothing and does not error. A non-existent topic produces an explicit error. A type mismatch causes an error, not silence.",
+    "source_excerpt": "ros2 topic echo connects to a topic and blocks waiting for messages. If no publisher is active, the command waits silently.",
+    "source_heading": "ROS 2 Fundamentals > CLI Tools > ros2 topic",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q2 — Bloom: Analyze. Package not found after successful build.",
+    "question": "A developer creates a ROS 2 package with a publisher node. After building with colcon and sourcing the workspace, they run:\n\n```bash\nros2 run my_robot_pkg talker\n```\n\nThey receive the following error:\n\n```\nPackage 'my_robot_pkg' not found\n```\n\nThe developer confirms the package folder exists inside the src/ directory and the build completed without errors. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The package name in package.xml does not match the folder name.",
+        "is_correct": false,
+        "distractor_rationale": "A name mismatch would typically cause the build itself to fail, not a post-build runtime error."
+      },
+      {
+        "label": "B",
+        "text": "The developer forgot to source the workspace overlay with source install/setup.bash.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "colcon build was run from inside the src/ directory instead of the workspace root.",
+        "is_correct": false,
+        "distractor_rationale": "Running colcon from inside src/ causes build errors, not a silent success followed by a missing-package error."
+      },
+      {
+        "label": "D",
+        "text": "The node entry point is missing from the setup.py console_scripts section.",
+        "is_correct": false,
+        "distractor_rationale": "A missing entry point would produce 'No executable found' rather than 'Package not found'."
+      }
+    ],
+    "explanation": "The ament package index is written to install/ during the build, but ros2 run only sees it after the overlay is sourced. The build succeeded, so a wrong build directory (C) is eliminated. Only sourcing resolves the 'Package not found' error.",
+    "source_excerpt": "After colcon build, you must source install/setup.bash to register the new packages with the ROS 2 package index.",
+    "source_heading": "ROS 2 Fundamentals > Workspace > Sourcing the Overlay",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q3 — Bloom: Apply. Correct sequence to create package with custom service. Arrange-in-order wrapped as MCQ.",
+    "question": "A student wants to create a ROS 2 Python package that defines a custom service, implement a server node for it, and verify the service is live. The following 5 steps are required but are listed out of order:\n\n1. Define the .srv file and declare it in CMakeLists.txt, then build the package\n2. Source the workspace and call the service using ros2 service call\n3. Create the ROS 2 package with ros2 pkg create, specifying build type and dependencies\n4. Write the service server node in Python, importing the generated service type\n5. Register the node as an entry point in setup.py and rebuild\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "3 → 1 → 4 → 5 → 2",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "1 → 3 → 5 → 4 → 2",
+        "is_correct": false,
+        "distractor_rationale": "Attempting to define the .srv file before the package exists has no target directory to write into."
+      },
+      {
+        "label": "C",
+        "text": "3 → 4 → 1 → 5 → 2",
+        "is_correct": false,
+        "distractor_rationale": "Writing the server node (4) before building the .srv file (1) means the generated service type Python module does not yet exist and cannot be imported."
+      },
+      {
+        "label": "D",
+        "text": "1 → 4 → 3 → 5 → 2",
+        "is_correct": false,
+        "distractor_rationale": "Starts with .srv definition and node writing before any package exists — both steps have no workspace context."
+      }
+    ],
+    "explanation": "Create the package first (3), define and build the custom service type so Python can import it (1), write the server node that uses the generated type (4), register and rebuild so ros2 run can find the node (5), then verify by calling the service (2).",
+    "source_excerpt": "Custom service types must be compiled before any Python node can import them. The package must exist before either the .srv file or the server node can be created.",
+    "source_heading": "ROS 2 Services > Custom Service Types",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "arrange_in_order",
+    "ordered_steps": [
+      "Create the ROS 2 package with ros2 pkg create, specifying build type and dependencies",
+      "Define the .srv file and declare it in CMakeLists.txt, then build the package",
+      "Write the service server node in Python, importing the generated service type",
+      "Register the node as an entry point in setup.py and rebuild",
+      "Source the workspace and call the service using ros2 service call"
+    ]
+  },
+  {
+    "_comment": "Q4 — Bloom: Analyze. Launch file output='log' hides terminal output.",
+    "question": "A student writes the following ROS 2 launch file to bring up a robot node with parameters loaded from a YAML file:\n\n```python\nfrom launch import LaunchDescription\nfrom launch_ros.actions import Node\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='my_robot_pkg',\n            executable='controller_node',\n            name='controller',\n            parameters=['config/robot_params.yaml'],\n            remappings=[('/cmd_vel', '/robot/cmd_vel')],\n            output='log'\n        )\n    ])\n```\n\nThe node launches without error, but during debugging the developer cannot see any terminal output from the node's logger calls. Which line contains the error and what is its consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "parameters=['config/robot_params.yaml'] — relative paths are not resolved at runtime, so parameters silently fail to load and the node uses defaults.",
+        "is_correct": false,
+        "distractor_rationale": "Relative paths missing at runtime raise a FileNotFoundError — they do not silently fail."
+      },
+      {
+        "label": "B",
+        "text": "output='log' — all stdout and rclpy logger output is written to ~/.ros/log/ only, not shown in the terminal.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "remappings=[('/cmd_vel', '/robot/cmd_vel')] — remappings require the tilde (~) prefix to work correctly with node namespaces.",
+        "is_correct": false,
+        "distractor_rationale": "The tilde prefix is for private topic namespacing, not a requirement for remappings to function."
+      },
+      {
+        "label": "D",
+        "text": "executable='controller_node' — the executable name must match the Python filename exactly, including the .py extension.",
+        "is_correct": false,
+        "distractor_rationale": "ROS 2 executables are registered by name in setup.py console_scripts; the .py extension is never used in the executable field."
+      }
+    ],
+    "explanation": "output='log' routes all node output including rclpy logging exclusively to the log file under ~/.ros/log/, suppressing terminal display entirely. The correct value for visible terminal output is output='screen'.",
+    "source_excerpt": "Setting output='log' in a launch Node action redirects all stdout and log output to the ROS 2 log file directory. Use output='screen' to display output in the terminal.",
+    "source_heading": "ROS 2 Launch > Node Action > output Parameter",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q5 — Bloom: Analyze. Missing collision element in URDF LiDAR link.",
+    "question": "A robot's URDF has a LiDAR link defined with a mesh for its visual geometry. A developer removes the <collision> element from that link entirely. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR disappears from RViz visualisation.",
+        "is_correct": false,
+        "distractor_rationale": "RViz renders the <visual> element; the <collision> element is irrelevant to RViz rendering."
+      },
+      {
+        "label": "B",
+        "text": "Gazebo ignores the link and does not spawn it.",
+        "is_correct": false,
+        "distractor_rationale": "Gazebo spawns all links defined in the URDF; a missing <collision> removes physics contact geometry but the link still exists."
+      },
+      {
+        "label": "C",
+        "text": "The robot spawns and moves correctly in Gazebo, but the LiDAR link passes through obstacles.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "URDF validation fails and the robot cannot be loaded.",
+        "is_correct": false,
+        "distractor_rationale": "A missing <collision> element is not a URDF schema error; the specification allows links without collision geometry."
+      }
+    ],
+    "explanation": "Gazebo uses the <collision> geometry for physics contact detection. Without it, the link has no collision boundary and passes through other objects. The <visual> element still renders correctly in both RViz and Gazebo.",
+    "source_excerpt": "The <collision> element in URDF defines the geometry Gazebo uses for contact physics. Without it, the link has no physical presence in simulation and passes through other bodies.",
+    "source_heading": "URDF > Link Elements > collision",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q6 — Bloom: Analyze. XACRO snippet swaps length/radius on cylinder.",
+    "question": "A student writes the following XACRO snippet to parameterise wheel geometry:\n\n```xml\n<xacro:property name=\"wheel_radius\" value=\"0.05\"/>\n<xacro:property name=\"wheel_width\"  value=\"0.02\"/>\n<link name=\"left_wheel\">\n  <visual>\n    <geometry>\n      <cylinder length=\"${wheel_radius}\" radius=\"${wheel_width}\"/>\n    </geometry>\n  </visual>\n</link>\n```\n\nThe robot loads without error but the wheels appear visually incorrect in RViz. Which line contains the error?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The xacro:property tags use value= instead of default= to set property values.",
+        "is_correct": false,
+        "distractor_rationale": "value= is the correct attribute for xacro:property; default= is used for xacro:arg, not xacro:property."
+      },
+      {
+        "label": "B",
+        "text": "The cylinder element swaps the length and radius attributes — wheel_radius is passed to length and wheel_width to radius.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The ${} substitution syntax is invalid inside geometry tags and must use xacro:arg instead.",
+        "is_correct": false,
+        "distractor_rationale": "${} substitution is valid anywhere inside an XACRO file, including inside geometry elements."
+      },
+      {
+        "label": "D",
+        "text": "The link is missing an <inertial> block, causing RViz to render geometry incorrectly.",
+        "is_correct": false,
+        "distractor_rationale": "A missing <inertial> block affects Gazebo physics simulation, not RViz visual rendering."
+      }
+    ],
+    "explanation": "A URDF cylinder uses length for the axle-axis dimension and radius for the rolling dimension. The snippet assigns wheel_radius (0.05) to length and wheel_width (0.02) to radius, producing a tall thin cylinder instead of a flat wheel.",
+    "source_excerpt": "URDF cylinder geometry uses 'length' for the axis-aligned dimension and 'radius' for the circular cross-section. Swapping these values produces the wrong visual shape.",
+    "source_heading": "URDF > Geometry > Cylinder",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q7 — Bloom: Remember. Linear velocity formula for differential drive robot.",
+    "question": "A differential drive robot has wheel radius r and wheelbase L. The left wheel spins at angular velocity ωL and the right at ωR. What is the robot's linear velocity v?",
+    "options": [
+      {
+        "label": "A",
+        "text": "v = r(ωR − ωL) / 2",
+        "is_correct": false,
+        "distractor_rationale": "This computes the contribution to angular velocity, not linear velocity — the difference drives turning, not forward motion."
+      },
+      {
+        "label": "B",
+        "text": "v = r(ωR + ωL) / 2",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "v = (ωR + ωL) / 2L",
+        "is_correct": false,
+        "distractor_rationale": "Omits the wheel radius r and divides by wheelbase L — conflating the linear and angular velocity formulas."
+      },
+      {
+        "label": "D",
+        "text": "v = r·ωR − r·ωL",
+        "is_correct": false,
+        "distractor_rationale": "Computes the difference in wheel ground speeds, which contributes to angular velocity, not the robot's forward linear velocity."
+      }
+    ],
+    "explanation": "Each wheel's ground speed is r·ω. The robot's forward velocity is the mean of both wheel ground speeds: v = r(ωR + ωL)/2. Option A computes angular velocity ω.",
+    "source_excerpt": "For a differential drive robot, linear velocity v = r(ωR + ωL)/2 and angular velocity ω = r(ωR − ωL)/L.",
+    "source_heading": "Kinematics > Differential Drive > Velocity Equations",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q8 — Bloom: Analyze. Wheelbase miscalibration causes rotation undershoot.",
+    "question": "A robot's odometry computation uses a wheelbase L = 0.3 m, but the physical robot has L = 0.5 m. The robot executes a 90° in-place rotation command. What is the observed consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The robot translates sideways instead of rotating.",
+        "is_correct": false,
+        "distractor_rationale": "Wheelbase miscalibration affects angular computation, not the type of motion commanded."
+      },
+      {
+        "label": "B",
+        "text": "The robot rotates but overshoots, turning more than 90°.",
+        "is_correct": false,
+        "distractor_rationale": "With L underestimated, computed ω is inflated — the controller believes 90° is reached too early and stops before actual 90°, not after."
+      },
+      {
+        "label": "C",
+        "text": "The robot rotates but undershoots, turning less than 90°.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Linear velocity is affected, but angular velocity is unchanged.",
+        "is_correct": false,
+        "distractor_rationale": "Wheelbase L only appears in the angular velocity formula ω = r(ωR − ωL)/L; linear velocity is unaffected."
+      }
+    ],
+    "explanation": "Angular velocity ω = r(ωR − ωL)/L. With L underestimated (0.3 vs 0.5), the computed ω is larger than the true physical rotation rate. The controller believes the robot has reached 90° before it actually has and stops early — producing an undershoot.",
+    "source_excerpt": "If the wheelbase L used in odometry is smaller than the physical L, computed angular velocity will be inflated, causing the controller to stop rotation before the target angle is reached.",
+    "source_heading": "Kinematics > Differential Drive > Odometry Calibration",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q9 — Bloom: Analyze. Rotation drift caused by miscalibrated wheelbase.",
+    "question": "A robot's odometry drifts significantly after a 360° rotation, even though the encoders report the correct number of ticks. The developer checks: wheel radius is calibrated, tick-to-radian conversion is correct, and the update loop runs at a stable rate. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Encoder tick resolution is too low for the wheel circumference.",
+        "is_correct": false,
+        "distractor_rationale": "Low tick resolution causes both linear and angular drift; the problem here is isolated to rotation with correct encoder counts."
+      },
+      {
+        "label": "B",
+        "text": "The wheelbase L used in the angular velocity formula is miscalibrated.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The odometry is integrated using the Euler method with too large a timestep.",
+        "is_correct": false,
+        "distractor_rationale": "Euler integration error causes general position drift accumulating over time, not an error specifically proportional to total rotation angle."
+      },
+      {
+        "label": "D",
+        "text": "The quaternion representing heading was not normalised after each update.",
+        "is_correct": false,
+        "distractor_rationale": "ROS 2 odometry typically uses yaw angle directly; quaternion normalisation errors are not the standard cause of rotation-specific drift."
+      }
+    ],
+    "explanation": "A full rotation with no net translation is a pure test of angular odometry, which depends entirely on L in ω = r(ωR − ωL)/L. A miscalibrated L accumulates angular error across the full 360°, producing a drift when returning to the start pose.",
+    "source_excerpt": "Rotation accuracy in differential drive odometry is governed primarily by wheelbase calibration. Even small errors in L accumulate proportionally with total rotation angle.",
+    "source_heading": "Kinematics > Differential Drive > Odometry Calibration",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q10 — Bloom: Analyze. Wheels slide in Gazebo due to missing inertial block.",
+    "question": "A URDF robot is spawned in Gazebo, but the wheels slide instead of rolling. Which missing element causes this?",
+    "options": [
+      {
+        "label": "A",
+        "text": "<visual> geometry on the wheel links.",
+        "is_correct": false,
+        "distractor_rationale": "<visual> affects rendering only; its absence does not affect Gazebo physics."
+      },
+      {
+        "label": "B",
+        "text": "<collision> geometry on the wheel links.",
+        "is_correct": false,
+        "distractor_rationale": "<collision> defines contact shape; without it the wheels would pass through the ground, not slide on it."
+      },
+      {
+        "label": "C",
+        "text": "<inertial> block with mass and inertia tensor on the wheel links.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "<gazebo> material tag on the wheel links.",
+        "is_correct": false,
+        "distractor_rationale": "The <gazebo> material tag affects visual colour/texture in Gazebo, not friction or contact physics."
+      }
+    ],
+    "explanation": "Without <inertial>, Gazebo treats the link as massless and cannot apply friction or torque — wheels slide freely. <visual> only affects rendering. <collision> defines contact shape but friction still requires inertia to act upon.",
+    "source_excerpt": "Gazebo requires an <inertial> block with a valid mass and inertia tensor on each dynamic link. Without it, the link is treated as static and massless, preventing friction from acting correctly.",
+    "source_heading": "URDF / Gazebo > Link Elements > inertial",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q11 — Bloom: Understand. Increasing LiDAR samples in Gazebo plugin.",
+    "question": "A Gazebo LiDAR plugin has samples set to 360. A developer increases it to 1440. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR range increases proportionally.",
+        "is_correct": false,
+        "distractor_rationale": "Range is a separate parameter; sample count controls angular density, not maximum detection distance."
+      },
+      {
+        "label": "B",
+        "text": "The /scan topic publishes at a higher frequency.",
+        "is_correct": false,
+        "distractor_rationale": "Publish frequency is controlled by update_rate in the plugin, not by the samples parameter."
+      },
+      {
+        "label": "C",
+        "text": "Angular resolution improves, but CPU load increases.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Gazebo throws a plugin error; samples must match the URDF ray count.",
+        "is_correct": false,
+        "distractor_rationale": "Gazebo imposes no hard constraint linking the samples parameter to URDF ray geometry definitions."
+      }
+    ],
+    "explanation": "More samples means finer angular resolution (4× denser rays) at the same scan rate, but each update is more expensive to compute, raising CPU load. Range is a separate parameter unaffected by sample count.",
+    "source_excerpt": "The 'samples' parameter in the Gazebo ray plugin determines the number of rays per scan sweep, directly controlling angular resolution and CPU cost per scan update.",
+    "source_heading": "Gazebo Plugins > LiDAR (Ray) Plugin > Parameters",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q12 — Bloom: Analyze. LiDAR scan floating above robot in RViz due to frame_id mismatch.",
+    "question": "A robot spawns in Gazebo and the /scan topic publishes data, but RViz shows the laser scan floating above the robot instead of at sensor height. What is the cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR plugin's frame_id does not match the sensor link name in the URDF.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "The laser scan message is published with the wrong topic name.",
+        "is_correct": false,
+        "distractor_rationale": "A wrong topic name would result in no scan being visible at all in RViz, not a mispositioned one."
+      },
+      {
+        "label": "C",
+        "text": "RViz Fixed Frame is set to odom instead of base_link.",
+        "is_correct": false,
+        "distractor_rationale": "The Fixed Frame controls global reference but does not cause sensor-relative placement errors like floating at the wrong height."
+      },
+      {
+        "label": "D",
+        "text": "The update_rate in the plugin is too high for RViz to render correctly.",
+        "is_correct": false,
+        "distractor_rationale": "update_rate affects frequency and CPU load; it has no effect on the spatial placement of scan points."
+      }
+    ],
+    "explanation": "RViz positions the scan cloud using the frame_id in the LaserScan message header. If frame_id names a different frame than the URDF sensor link, TF cannot resolve the correct transform and the scan appears at the wrong position.",
+    "source_excerpt": "The LiDAR plugin's 'frameName' parameter must match the corresponding link name in the URDF so TF can correctly transform scan data into the robot frame.",
+    "source_heading": "Gazebo Plugins > LiDAR (Ray) Plugin > frame_id",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q13 — Bloom: Analyze. Increasing minimum_travel_distance in SLAM Toolbox reduces map update frequency.",
+    "question": "A developer increases minimum_travel_distance in SLAM Toolbox from 0.1 m to 0.5 m. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The map updates more frequently, increasing CPU load.",
+        "is_correct": false,
+        "distractor_rationale": "A larger threshold means fewer updates per metre — the opposite effect on both map freshness and CPU load."
+      },
+      {
+        "label": "B",
+        "text": "Loop closure checks are disabled entirely.",
+        "is_correct": false,
+        "distractor_rationale": "Loop closure is a separate pipeline in SLAM Toolbox; minimum_travel_distance controls scan insertion, not loop closure."
+      },
+      {
+        "label": "C",
+        "text": "The map updates less frequently, causing drift in corridors with few features.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Scan matching fails because scans are too far apart to overlap.",
+        "is_correct": false,
+        "distractor_rationale": "At 0.5 m intervals and typical LiDAR ranges of 10–30 m, scans still overlap substantially; scan matching continues to function."
+      }
+    ],
+    "explanation": "A larger threshold means fewer map updates per metre travelled. In a long featureless corridor, odometry drift accumulates between updates with no scan correction, degrading map quality. CPU load decreases, not increases.",
+    "source_excerpt": "SLAM Toolbox's minimum_travel_distance parameter sets the minimum robot displacement between consecutive map update attempts. Larger values reduce CPU load but allow more odometry drift between scan corrections.",
+    "source_heading": "SLAM Toolbox > Configuration Parameters > minimum_travel_distance",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q14 — Bloom: Analyze. Walls remain grey (unknown) on /map — LiDAR range too short.",
+    "question": "A robot runs SLAM Toolbox and the occupancy grid on /map appears correct in RViz, but walls show as grey (unknown) instead of black (occupied) after the robot passes them. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR scan range is set lower than the distance to the walls.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "The /scan topic frame_id does not match the URDF sensor link.",
+        "is_correct": false,
+        "distractor_rationale": "A frame_id mismatch would spatially misplace the entire scan, not selectively fail to mark far walls."
+      },
+      {
+        "label": "C",
+        "text": "SLAM Toolbox is running in localization mode, not mapping mode.",
+        "is_correct": false,
+        "distractor_rationale": "Localization mode would prevent any new map cells from being written at all; the description says the nearby map is correct."
+      },
+      {
+        "label": "D",
+        "text": "The map resolution is too coarse to represent the wall thickness.",
+        "is_correct": false,
+        "distractor_rationale": "Coarse resolution would make walls blocky or single-cell thick, but they would still be marked occupied, not unknown."
+      }
+    ],
+    "explanation": "If the LiDAR's max range parameter is shorter than the actual wall distance, beams terminate before hitting the wall and no occupied cells are written — cells remain unknown. The nearby portions of the map are correct because those walls are within range.",
+    "source_excerpt": "SLAM Toolbox only marks cells as occupied when a LiDAR ray terminates at an obstacle. If the scan's maximum range is shorter than the obstacle distance, the ray ends in free space and the cell is never marked.",
+    "source_heading": "SLAM Toolbox > Sensor Configuration > range_max",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q15 — Bloom: Apply. Correct sequence to build, save, and reuse a SLAM map.",
+    "question": "A developer wants to build a map, save it, then reuse it for localization on the next run. The 5 steps are listed out of order:\n\n1. Launch SLAM Toolbox in localization mode with the saved .posegraph file\n2. Drive the robot through the environment until the map is complete\n3. Call the serialize_map service to save the map as a .posegraph file\n4. Launch SLAM Toolbox in mapping mode with slam_toolbox online_async\n5. Verify localization by checking that /map and /amcl_pose topics are publishing\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "4 → 2 → 1 → 3 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Inserts localization mode (1) before the map is serialized (3), so no .posegraph file yet exists to load."
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 3 → 1 → 5",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "2 → 4 → 3 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Starts driving before SLAM is running, so no map is being built."
+      },
+      {
+        "label": "D",
+        "text": "4 → 3 → 2 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Serializes the map immediately after launch before any exploration data has been collected, saving an empty map."
+      }
+    ],
+    "explanation": "Start SLAM in mapping mode (4), drive to build the map (2), serialize to disk (3), relaunch in localization mode with the saved file (1), then verify topics (5).",
+    "source_excerpt": "SLAM Toolbox's serialize_map service saves the current posegraph to disk. This file can later be loaded in localization-only mode to enable navigation without further mapping.",
+    "source_heading": "SLAM Toolbox > Map Serialization and Localization Mode",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "arrange_in_order",
+    "ordered_steps": [
+      "Launch SLAM Toolbox in mapping mode with slam_toolbox online_async",
+      "Drive the robot through the environment until the map is complete",
+      "Call the serialize_map service to save the map as a .posegraph file",
+      "Launch SLAM Toolbox in localization mode with the saved .posegraph file",
+      "Verify localization by checking that /map and /amcl_pose topics are publishing"
+    ]
+  },
+  {
+    "_comment": "Q16 — Bloom: Apply. Increasing inflation_radius to keep robot away from walls.",
+    "question": "A robot using Nav2 plans a path that hugs walls too closely, risking collisions. Which costmap parameter should the developer increase?",
+    "options": [
+      {
+        "label": "A",
+        "text": "resolution",
+        "is_correct": false,
+        "distractor_rationale": "resolution controls cell size, not the cost zone around obstacles."
+      },
+      {
+        "label": "B",
+        "text": "inflation_radius",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "update_frequency",
+        "is_correct": false,
+        "distractor_rationale": "update_frequency controls how often the costmap refreshes, not how much clearance the planner keeps from walls."
+      },
+      {
+        "label": "D",
+        "text": "transform_tolerance",
+        "is_correct": false,
+        "distractor_rationale": "transform_tolerance controls TF timing thresholds, not path clearance."
+      }
+    ],
+    "explanation": "inflation_radius expands the cost zone around obstacles in the costmap, forcing the global planner to route further from walls. The other parameters control resolution, refresh rate, and TF timing respectively.",
+    "source_excerpt": "The inflation_radius parameter in Nav2's costmap inflation layer defines the radius around obstacles that is marked with decreasing cost values, encouraging the planner to route away from walls.",
+    "source_heading": "Nav2 > Costmap > Inflation Layer > inflation_radius",
+    "bloom_level": "apply",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q17 — Bloom: Understand. Reducing max_vel_x in DWB local planner.",
+    "question": "A developer reduces the DWB local planner's max_vel_x from 0.5 m/s to 0.1 m/s. What is the observed consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The robot stops executing recovery behaviours.",
+        "is_correct": false,
+        "distractor_rationale": "Recovery behaviours are triggered by being stuck, not by velocity limits."
+      },
+      {
+        "label": "B",
+        "text": "The robot moves slower but is less likely to overshoot goals.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The global planner replans more frequently.",
+        "is_correct": false,
+        "distractor_rationale": "The global planner runs independently of local velocity caps."
+      },
+      {
+        "label": "D",
+        "text": "The robot fails to reach goals in dynamic environments.",
+        "is_correct": false,
+        "distractor_rationale": "At 0.1 m/s the robot is slow but still capable of reaching goals; failure to reach goals is associated with being blocked, not just being slow."
+      }
+    ],
+    "explanation": "Capping forward speed makes the robot move more conservatively, reducing overshoot at goal positions. Recovery behaviours are triggered by being stuck, not by speed limits. The global planner runs independently of local velocity caps.",
+    "source_excerpt": "DWB's max_vel_x caps the maximum forward velocity the local planner will command. Lower values reduce overshoot at goals but increase time-to-goal.",
+    "source_heading": "Nav2 > DWB Local Planner > Velocity Limits",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q18 — Bloom: Analyze. Nav2 goal fails immediately with TF timeout error.",
+    "question": "A robot running Nav2 accepts a navigation goal in RViz, but the action immediately returns FAILED before the robot begins moving. The global costmap displays correctly, and the goal marker appears visually reachable. The terminal repeatedly shows messages similar to:\n\n```\nTimed out waiting for transform from base_link to map\n```\n\nWhat is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The goal is inside the inflation layer, making the planner treat the goal cell as occupied.",
+        "is_correct": false,
+        "distractor_rationale": "A goal inside the inflation layer causes a planning failure with a 'no path found' message, not a TF timeout error."
+      },
+      {
+        "label": "B",
+        "text": "The local planner simulation time is too short to generate valid trajectories.",
+        "is_correct": false,
+        "distractor_rationale": "Insufficient simulation time causes suboptimal or jerky movement, not an immediate FAILED before any motion begins."
+      },
+      {
+        "label": "C",
+        "text": "The Nav2 action server is not running, so the goal cannot be accepted.",
+        "is_correct": false,
+        "distractor_rationale": "If the action server were not running, the goal would not be accepted at all, not accepted and then failed with a TF error."
+      },
+      {
+        "label": "D",
+        "text": "transform_tolerance or TF timing configuration is too strict, causing transform lookup failures during planning.",
+        "is_correct": true,
+        "distractor_rationale": null
+      }
+    ],
+    "explanation": "Nav2 depends on valid TF transforms (map → odom → base_link) before planning can begin. If transforms are delayed, missing, or older than the configured transform_tolerance, Nav2 cannot determine the robot pose and immediately aborts the request, producing the 'Timed out waiting for transform' message.",
+    "source_excerpt": "Nav2 uses the TF tree to determine robot pose. If the transform lookup times out due to stale transforms or strict transform_tolerance settings, the planning pipeline aborts immediately.",
+    "source_heading": "Nav2 > Configuration > transform_tolerance",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q19 — Bloom: Apply. Correct sequence for Nav2 Simple Commander waypoint mission.",
+    "question": "A developer wants to send a robot on a three-waypoint mission using the Nav2 Simple Commander API. The 5 steps are listed out of order:\n\n1. Call follow_waypoints() with the list of three PoseStamped goals\n2. Initialize the BasicNavigator and call waitUntilNav2Active()\n3. Verify mission completion by checking getResult() returns SUCCEEDED\n4. Launch Nav2 with a saved map and confirm /amcl_pose is publishing\n5. Construct three PoseStamped objects with target positions and orientations\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "2 → 4 → 5 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Initialises BasicNavigator (2) before Nav2 is running (4) — waitUntilNav2Active() would block indefinitely."
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 5 → 1 → 3",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "4 → 5 → 2 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Constructs PoseStamped goals (5) before BasicNavigator exists (2) — the clock and frame context needed for stamping are not available."
+      },
+      {
+        "label": "D",
+        "text": "2 → 5 → 4 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Same problem as A — initialises the navigator before Nav2 is running."
+      }
+    ],
+    "explanation": "Nav2 must be launched first so localisation is active (4), then BasicNavigator initialises and waits for Nav2 to be ready (2), waypoints are constructed (5), the mission is sent (1), then the result is checked (3).",
+    "source_excerpt": "BasicNavigator.waitUntilNav2Active() blocks until the Nav2 lifecycle nodes are in the active state. Nav2 must be launched before calling this method.",
+    "source_heading": "Nav2 > Simple Commander API > BasicNavigator",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "arrange_in_order",
+    "ordered_steps": [
+      "Launch Nav2 with a saved map and confirm /amcl_pose is publishing",
+      "Initialize the BasicNavigator and call waitUntilNav2Active()",
+      "Construct three PoseStamped objects with target positions and orientations",
+      "Call follow_waypoints() with the list of three PoseStamped goals",
+      "Verify mission completion by checking getResult() returns SUCCEEDED"
+    ]
+  },
+  {
+    "_comment": "Q20 — Bloom: Remember. cv_bridge required to convert ROS image to OpenCV.",
+    "question": "A ROS 2 node subscribes to /camera/image_raw but OpenCV operations fail with a type error. The image message type is sensor_msgs/Image. What is the missing step?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Resize the image to a fixed resolution before processing.",
+        "is_correct": false,
+        "distractor_rationale": "Resizing is an optional processing step; it does not address the type incompatibility between sensor_msgs/Image and cv::Mat."
+      },
+      {
+        "label": "B",
+        "text": "Convert the message to a cv::Mat using cv_bridge.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Change the camera topic to publish CompressedImage instead.",
+        "is_correct": false,
+        "distractor_rationale": "CompressedImage is a different message type that requires additional decompression steps before OpenCV can process it."
+      },
+      {
+        "label": "D",
+        "text": "Enable the image_transport layer in the node.",
+        "is_correct": false,
+        "distractor_rationale": "image_transport handles transport plugins for efficient delivery; it does not convert message types to cv::Mat."
+      }
+    ],
+    "explanation": "cv_bridge converts sensor_msgs/Image to cv::Mat, which OpenCV operates on natively. Without this conversion, OpenCV receives a ROS message object and raises a type error.",
+    "source_excerpt": "cv_bridge provides CvBridge.imgmsg_to_cv2() to convert sensor_msgs/Image messages into OpenCV cv::Mat objects for processing.",
+    "source_heading": "ROS 2 Vision > cv_bridge > Image Conversion",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q21 — Bloom: Understand. Lowering cv2.threshold() value includes more pixels as foreground.",
+    "question": "A developer lowers the threshold value in cv2.threshold() from 127 to 40 on a greyscale camera feed used for contour detection. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Fewer contours are detected — only the brightest regions remain.",
+        "is_correct": false,
+        "distractor_rationale": "Fewer contours result from raising the threshold, not lowering it."
+      },
+      {
+        "label": "B",
+        "text": "More contours are detected — darker regions are now included as foreground.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Contour detection fails — threshold must be above 50 to function.",
+        "is_correct": false,
+        "distractor_rationale": "cv2.threshold() has no minimum value constraint; a value of 40 is valid and produces a binary image."
+      },
+      {
+        "label": "D",
+        "text": "The image is inverted before contour detection runs.",
+        "is_correct": false,
+        "distractor_rationale": "Inversion is produced by the THRESH_BINARY_INV flag, not by changing the threshold value."
+      }
+    ],
+    "explanation": "Lowering the threshold classifies more pixels as foreground (any pixel with intensity ≥ 40 instead of ≥ 127), including darker regions, producing more and larger binary regions from which contours are extracted.",
+    "source_excerpt": "In cv2.threshold() with THRESH_BINARY, pixels at or above the threshold value become white (foreground) and pixels below become black. A lower threshold includes more pixels as foreground.",
+    "source_heading": "ROS 2 Vision > OpenCV Integration > Thresholding",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q22 — Bloom: Analyze. ArUco pose jitter due to wrong marker size parameter.",
+    "question": "An ArUco marker is detected consistently in the camera image, but the published pose in RViz drifts and jitters even when the marker is stationary. The camera is calibrated and the marker ID is correct. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The marker size passed to aruco.estimatePoseSingleMarkers() is wrong.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "The pose is published without a fixed timestamp — it uses ros::Time::now() per frame.",
+        "is_correct": false,
+        "distractor_rationale": "Per-frame timestamps are normal practice and do not cause jitter in static marker pose; this would cause TF timing issues, not spatial noise."
+      },
+      {
+        "label": "C",
+        "text": "The camera_info topic is not being subscribed to, so intrinsics are unavailable.",
+        "is_correct": false,
+        "distractor_rationale": "Without camera intrinsics, estimatePoseSingleMarkers() would fail entirely, not produce jittery poses."
+      },
+      {
+        "label": "D",
+        "text": "The marker dictionary does not match the one used to generate the printed marker.",
+        "is_correct": false,
+        "distractor_rationale": "A dictionary mismatch would prevent detection entirely or produce incorrect IDs — not cause stable detection with jittery pose."
+      }
+    ],
+    "explanation": "aruco.estimatePoseSingleMarkers() uses the physical marker size to compute depth via perspective projection. An incorrect size scales the Z-axis estimate wrongly, and pixel-level detection jitter gets amplified into large pose errors at distance.",
+    "source_excerpt": "The markerLength parameter in aruco.estimatePoseSingleMarkers() must match the physical size of the printed marker in metres. An incorrect value introduces a constant depth scaling error that amplifies pixel-level noise into significant pose jitter.",
+    "source_heading": "ROS 2 Vision > ArUco Marker Detection > Pose Estimation",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q23 — Bloom: Apply. Correct sequence to detect ArUco marker and publish pose.",
+    "question": "A developer wants to detect an ArUco marker from a ROS 2 camera topic and publish its pose relative to the camera frame. The 5 steps are listed out of order:\n\n1. Call aruco.estimatePoseSingleMarkers() using camera intrinsics from camera_info\n2. Subscribe to /camera/image_raw and /camera/camera_info topics\n3. Convert the detected marker pose to a geometry_msgs/PoseStamped and publish it\n4. Convert the incoming image message to a cv::Mat using cv_bridge\n5. Run aruco.detectMarkers() on the greyscale image to get marker corners\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "2 → 4 → 5 → 1 → 3",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 5 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Attempts to convert a message (4) before subscribing to any topic (2) — no image data is available yet."
+      },
+      {
+        "label": "C",
+        "text": "2 → 5 → 4 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Runs detectMarkers() (5) on the raw ROS message before cv_bridge conversion (4) — OpenCV cannot operate on a sensor_msgs/Image directly."
+      },
+      {
+        "label": "D",
+        "text": "2 → 4 → 1 → 5 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Calls estimatePoseSingleMarkers() (1) before detectMarkers() (5) has produced the corner coordinates needed as input."
+      }
+    ],
+    "explanation": "Subscribe to both topics first to receive image and intrinsics (2), convert to cv::Mat via cv_bridge (4), detect marker corners (5), estimate pose using intrinsics (1), then convert and publish the pose (3).",
+    "source_excerpt": "ArUco pose estimation requires: (1) a cv::Mat image from cv_bridge, (2) corner detection via detectMarkers(), and (3) pose estimation via estimatePoseSingleMarkers() using camera intrinsics.",
+    "source_heading": "ROS 2 Vision > ArUco Marker Detection > Pipeline",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "arrange_in_order",
+    "ordered_steps": [
+      "Subscribe to /camera/image_raw and /camera/camera_info topics",
+      "Convert the incoming image message to a cv::Mat using cv_bridge",
+      "Run aruco.detectMarkers() on the greyscale image to get marker corners",
+      "Call aruco.estimatePoseSingleMarkers() using camera intrinsics from camera_info",
+      "Convert the detected marker pose to a geometry_msgs/PoseStamped and publish it"
+    ]
+  },
+  {
+    "_comment": "Q24 — Bloom: Analyze. ESP32 sends garbage over Serial due to baud rate mismatch.",
+    "question": "An ESP32 reads encoder pulses and publishes wheel odometry over Serial to a Raspberry Pi running ROS 2. The Pi receives garbage characters instead of valid data. The wiring is correct. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The ESP32 is publishing at too high a frequency for rosserial to handle.",
+        "is_correct": false,
+        "distractor_rationale": "High publish frequency causes buffer overflows producing truncated messages, not random garbage characters from every byte."
+      },
+      {
+        "label": "B",
+        "text": "The baud rate on the ESP32 and the Pi's serial listener do not match.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The ESP32 cannot publish odometry — it only supports sensor reads.",
+        "is_correct": false,
+        "distractor_rationale": "ESP32 can transmit any data structure over Serial; it is not restricted to read-only sensor operations."
+      },
+      {
+        "label": "D",
+        "text": "The Raspberry Pi's UART is disabled by default in raspi-config.",
+        "is_correct": false,
+        "distractor_rationale": "A disabled UART would produce no data at all, not garbled characters."
+      }
+    ],
+    "explanation": "Mismatched baud rates cause the receiver to sample bits at wrong intervals, producing garbled data. Publishing frequency affects buffer overflows, not character corruption. A disabled UART would produce no data at all.",
+    "source_excerpt": "Serial communication requires both transmitter and receiver to use the same baud rate. A mismatch causes bit sampling errors that produce garbled or garbage characters at the receiving end.",
+    "source_heading": "Embedded ROS > ESP32 Serial Communication > Baud Rate",
+    "bloom_level": "analyze",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q25 — Bloom: Analyze. Doubling encoder publish rate overflows Serial buffer.",
+    "question": "A developer doubles the encoder publishing frequency on an Arduino from 10 Hz to 20 Hz without changing the Serial baud rate. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Odometry accuracy automatically doubles because position updates are published more frequently.",
+        "is_correct": false,
+        "distractor_rationale": "Higher frequency alone does not improve accuracy; encoder resolution, timing stability, and noise also factor in."
+      },
+      {
+        "label": "B",
+        "text": "The Serial link cannot transmit data fast enough, causing buffer overflow and malformed messages.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "ROS 2 automatically reduces the encoder publish rate to match the available bandwidth.",
+        "is_correct": false,
+        "distractor_rationale": "ROS 2 does not throttle or backpressure a hardware serial publisher; the Arduino firmware controls the rate independently."
+      },
+      {
+        "label": "D",
+        "text": "The odometry message type dynamically expands to store the additional encoder data.",
+        "is_correct": false,
+        "distractor_rationale": "ROS message types are fixed at compile time and do not resize dynamically based on publish frequency."
+      }
+    ],
+    "explanation": "Doubling the publish frequency doubles the serial data volume per second. If the baud rate is unchanged, the transmit buffer cannot drain fast enough, causing overflow that results in truncated or corrupted odometry messages on the Pi.",
+    "source_excerpt": "Serial throughput is bounded by baud rate. Increasing the publish frequency without increasing baud rate will eventually overflow the transmit buffer, corrupting outgoing messages.",
+    "source_heading": "Embedded ROS > Arduino Serial > Throughput and Buffering",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q26 — Bloom: Analyze. ESP32 node disappears after firmware update — micro-ROS version mismatch.",
+    "question": "A micro-ROS node on an ESP32 was working correctly. After a firmware update the ROS 2 node list no longer shows the ESP32 node, but the Serial connection is active and the agent is running. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The micro-ROS agent version is incompatible with the updated firmware's micro-ROS library version.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "The ESP32 Serial baud rate changed after the firmware update.",
+        "is_correct": false,
+        "distractor_rationale": "A baud rate change would produce garbled data visible as Serial noise, not a silent missing node with an active connection."
+      },
+      {
+        "label": "C",
+        "text": "The Raspberry Pi's ROS 2 domain ID changed after reboot.",
+        "is_correct": false,
+        "distractor_rationale": "A domain ID mismatch would hide all ROS 2 nodes from the Pi, not just the ESP32 node specifically."
+      },
+      {
+        "label": "D",
+        "text": "The updated firmware publishes on a different topic name.",
+        "is_correct": false,
+        "distractor_rationale": "A topic name change would still show the node in ros2 node list — only the topic would differ, not the node visibility."
+      }
+    ],
+    "explanation": "micro-ROS client and agent must use matching library versions. A version mismatch causes the session handshake to fail silently — the agent runs and the Serial link is active, but no node is registered in the ROS 2 graph.",
+    "source_excerpt": "The micro-ROS client library embedded in firmware and the micro-ROS agent on the host must match versions. A mismatch causes the session establishment to fail, and the node will not appear in the ROS 2 graph.",
+    "source_heading": "Embedded ROS > micro-ROS > Agent/Client Version Compatibility",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q27 — Bloom: Apply. Correct sequence to publish IMU data from ESP32 via micro-ROS.",
+    "question": "A developer wants to read IMU data from a sensor over I2C on an ESP32 and publish it as a ROS 2 topic via micro-ROS. The 5 steps are listed out of order:\n\n1. Start the micro-ROS agent on the Raspberry Pi and verify the ESP32 node appears\n2. Write firmware that reads I2C sensor registers and populates a sensor_msgs/Imu struct\n3. Flash the firmware to the ESP32 and connect it to the Raspberry Pi over Serial\n4. Initialise the micro-ROS publisher and executor in the ESP32 firmware\n5. Verify IMU data by echoing the ROS 2 topic on the Raspberry Pi\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "2 → 4 → 3 → 1 → 5",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 3 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Initialises the publisher (4) before the sensor read logic (2) exists — the Imu struct has no data source to populate."
+      },
+      {
+        "label": "C",
+        "text": "2 → 3 → 4 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Flashes the firmware (3) before adding the micro-ROS publisher and executor (4) — flashed firmware is incomplete."
+      },
+      {
+        "label": "D",
+        "text": "4 → 3 → 2 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Flashes the firmware (3) before either the sensor logic or publisher is written — nothing useful is on the device."
+      }
+    ],
+    "explanation": "Write the sensor read logic first (2), initialise the micro-ROS publisher and executor within the same firmware (4), flash and connect to the Pi (3), start the agent and confirm node discovery (1), then echo the topic to verify data (5).",
+    "source_excerpt": "micro-ROS firmware development follows: write sensor and application logic, initialise micro-ROS publisher and executor, flash to device, start agent on host, verify ROS 2 topic output.",
+    "source_heading": "Embedded ROS > micro-ROS > ESP32 Development Workflow",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "arrange_in_order",
+    "ordered_steps": [
+      "Write firmware that reads I2C sensor registers and populates a sensor_msgs/Imu struct",
+      "Initialise the micro-ROS publisher and executor in the ESP32 firmware",
+      "Flash the firmware to the ESP32 and connect it to the Raspberry Pi over Serial",
+      "Start the micro-ROS agent on the Raspberry Pi and verify the ESP32 node appears",
+      "Verify IMU data by echoing the ROS 2 topic on the Raspberry Pi"
+    ]
+  },
+  {
+    "_comment": "Q28 — Bloom: Understand. Left wheel faster causes robot to turn right.",
+    "question": "A differential drive robot's left wheel moves faster than its right wheel. Which way does the robot turn?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Left",
+        "is_correct": false,
+        "distractor_rationale": "The robot turns toward the slower wheel — if the left wheel is faster, the nose is pushed toward the right."
+      },
+      {
+        "label": "B",
+        "text": "Right",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Straight, because the speed difference only affects linear velocity.",
+        "is_correct": false,
+        "distractor_rationale": "The opposite is true — speed difference between wheels drives angular velocity (turning), while their sum drives linear velocity."
+      },
+      {
+        "label": "D",
+        "text": "The robot stops and rotates in place.",
+        "is_correct": false,
+        "distractor_rationale": "In-place rotation requires wheels to spin at equal speeds in opposite directions, not just different speeds."
+      }
+    ],
+    "explanation": "When the left wheel moves faster, it covers more ground on the left side, pushing the robot's nose toward the right. The robot always turns in the direction of the slower wheel.",
+    "source_excerpt": "In a differential drive robot, angular motion is produced by a speed difference between the two wheels. The robot turns toward the side of the slower wheel.",
+    "source_heading": "Kinematics > Differential Drive > Turning Behaviour",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q29 — Bloom: Remember. Role of the global costmap in Nav2.",
+    "question": "In Nav2, what is the role of the global costmap?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Controls the robot's maximum speed during navigation.",
+        "is_correct": false,
+        "distractor_rationale": "Speed limits are set in the local planner velocity parameters, not in the costmap."
+      },
+      {
+        "label": "B",
+        "text": "Represents the full environment for long-range path planning.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Tracks dynamic obstacles immediately around the robot.",
+        "is_correct": false,
+        "distractor_rationale": "This describes the local costmap, which covers a small rolling window around the robot and is updated frequently."
+      },
+      {
+        "label": "D",
+        "text": "Publishes the robot's localisation estimate.",
+        "is_correct": false,
+        "distractor_rationale": "Localisation is handled by AMCL or SLAM Toolbox, not by the costmap."
+      }
+    ],
+    "explanation": "The global costmap represents the entire known environment, built from the static map. The global planner uses it to compute a full path from the robot's current position to the goal.",
+    "source_excerpt": "The global costmap in Nav2 is a static representation of the full environment used by the global planner to compute complete paths. It is typically built from a pre-existing occupancy grid map.",
+    "source_heading": "Nav2 > Costmap 2D > Global Costmap",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q30 — Bloom: Remember. Command to list active topics in ROS 2.",
+    "question": "Which command lists all active topics currently registered in a ROS 2 system?",
+    "options": [
+      {
+        "label": "A",
+        "text": "ros2 node list",
+        "is_correct": false,
+        "distractor_rationale": "ros2 node list lists active nodes, not topics."
+      },
+      {
+        "label": "B",
+        "text": "ros2 topic list",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "ros2 topic echo",
+        "is_correct": false,
+        "distractor_rationale": "ros2 topic echo subscribes to a specific named topic and prints its messages; it does not list topics."
+      },
+      {
+        "label": "D",
+        "text": "ros2 param list",
+        "is_correct": false,
+        "distractor_rationale": "ros2 param list lists parameters for a given node, not topics."
+      }
+    ],
+    "explanation": "ros2 topic list queries the ROS 2 graph and returns all topics currently registered, whether or not they have active publishers or subscribers.",
+    "source_excerpt": "The ros2 topic list command queries the DDS discovery layer and returns all topics currently registered in the ROS 2 graph.",
+    "source_heading": "ROS 2 Fundamentals > CLI Tools > ros2 topic",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Code-Q1a — Bloom: Apply. Heartbeat node: correct parameter read and timer creation.",
+    "question": "A developer is completing the heartbeat publisher node below. The parameter 'publish_rate' has already been declared with a default of 1.0 Hz.\n\n```python\nclass HeartbeatNode(Node):\n    def __init__(self):\n        super().__init__('heartbeat_node')\n        self.declare_parameter('publish_rate', 1.0)\n        self.publisher_ = self.create_publisher(String, '/robot/heartbeat', 10)\n        # TODO 1: Read parameter and create timer\n        pass\n```\n\nWhich implementation of TODO 1 correctly reads the parameter and creates the timer?",
+    "options": [
+      {
+        "label": "A",
+        "text": "rate = self.get_parameter('publish_rate').value\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": false,
+        "distractor_rationale": "get_parameter().value returns a ParameterValue object, not a float. The correct call chains .get_parameter_value().double_value."
+      },
+      {
+        "label": "B",
+        "text": "rate = self.get_parameter('publish_rate').get_parameter_value().double_value\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "rate = self.declare_parameter('publish_rate', 1.0)\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": false,
+        "distractor_rationale": "declare_parameter() registers a parameter and returns a Parameter object, not the float value. The parameter has already been declared, so calling it again would raise a ParameterAlreadyDeclaredException."
+      },
+      {
+        "label": "D",
+        "text": "rate = self.parameters['publish_rate']\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": false,
+        "distractor_rationale": "self.parameters is not a valid dict-style accessor in rclpy. Parameters must be retrieved via self.get_parameter()."
+      }
+    ],
+    "explanation": "The correct accessor chain is get_parameter('name').get_parameter_value().double_value. Using .value directly returns a ParameterValue wrapper object, and self.parameters[] is not a valid rclpy API. declare_parameter() registers a parameter — calling it again raises an exception.",
+    "source_excerpt": "In rclpy, reading a float parameter requires: self.get_parameter('name').get_parameter_value().double_value",
+    "source_heading": "ROS 2 Parameters > rclpy API > get_parameter",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "code_mcq",
+    "code_language": "python"
+  },
+  {
+    "_comment": "Code-Q1b — Bloom: Apply. Heartbeat node: correct message format in publish callback.",
+    "question": "A developer completes the publish_heartbeat callback for the heartbeat node. self.seq_count is initialized to 0 in __init__.\n\n```python\ndef publish_heartbeat(self):\n    # TODO 2: Build message and publish\n    pass\n```\n\nThe monitoring dashboard asserts the data field must exactly match:\n```\nHEARTBEAT | seq=<count> | node=heartbeat_node\n```\n\nWhich implementation is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "msg = String()\nmsg.data = f'HEARTBEAT | seq={self.seq_count} | node=heartbeat_node'\nself.publisher_.publish(msg)\nself.seq_count += 1",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "msg = String()\nmsg.data = f'HEARTBEAT | seq={self.seq_count} | node=heartbeat_node'\nself.seq_count += 1\nself.publisher_.publish(msg)",
+        "is_correct": false,
+        "distractor_rationale": "Increments the counter before publishing. The message is published with the correct count but the post-increment order matches the spec — however the spec says 'Increment the counter after publishing', so this order violates TR-4 as written."
+      },
+      {
+        "label": "C",
+        "text": "msg.data = f'HEARTBEAT | seq={self.seq_count} | node=heartbeat_node'\nself.publisher_.publish(msg)\nself.seq_count += 1",
+        "is_correct": false,
+        "distractor_rationale": "Attempts to set msg.data before instantiating the String() object — this raises an AttributeError since msg is not yet defined."
+      },
+      {
+        "label": "D",
+        "text": "msg = String()\nmsg.data = 'HEARTBEAT | seq=' + self.seq_count + ' | node=heartbeat_node'\nself.publisher_.publish(msg)\nself.seq_count += 1",
+        "is_correct": false,
+        "distractor_rationale": "Attempts to concatenate an integer (self.seq_count) with strings using +, which raises a TypeError in Python. str(self.seq_count) or an f-string is required."
+      }
+    ],
+    "explanation": "The correct implementation instantiates String(), formats the data field using an f-string with the current counter value, publishes, then increments. Option D fails with TypeError when concatenating int and str. Option C raises AttributeError as msg is undefined. Option B increments before publishing, violating the spec order.",
+    "source_excerpt": "std_msgs/String messages must be instantiated before setting the .data field. Python f-strings are the idiomatic way to embed integer counters in message strings.",
+    "source_heading": "ROS 2 Fundamentals > Publishing Messages > std_msgs/String",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "code_mcq",
+    "code_language": "python"
+  },
+  {
+    "_comment": "Code-Q2a — Bloom: Apply. ObstacleStopper: correct subscriber and parameter setup in __init__.",
+    "question": "A developer is completing the ObstacleStopper node. The stop_distance parameter has already been declared.\n\n```python\ndef __init__(self):\n    super().__init__('obstacle_stopper')\n    self.declare_parameter('stop_distance', 0.5)\n    self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)\n    # TODO 1:\n    # a) Read stop_distance and store as self.stop_dist\n    # b) Subscribe to /scan; callback: self.scan_callback\n    pass\n```\n\nWhich implementation of TODO 1 is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "self.stop_dist = self.get_parameter('stop_distance').get_parameter_value().double_value\nself.create_subscription(LaserScan, '/scan', self.scan_callback, 10)",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "self.stop_dist = self.get_parameter('stop_distance')\nself.scan_sub = self.create_subscription('/scan', LaserScan, self.scan_callback, 10)",
+        "is_correct": false,
+        "distractor_rationale": "get_parameter() returns a Parameter object, not a float. Additionally, create_subscription() requires the message type as the first positional argument, not the topic string."
+      },
+      {
+        "label": "C",
+        "text": "self.stop_dist = float(self.get_parameter('stop_distance'))\nself.create_subscription(LaserScan, '/scan', self.scan_callback, 10)",
+        "is_correct": false,
+        "distractor_rationale": "float() on a Parameter object does not extract the numeric value — it would raise a TypeError. The correct chain is .get_parameter_value().double_value."
+      },
+      {
+        "label": "D",
+        "text": "self.stop_dist = 0.5\nself.create_subscription(LaserScan, '/scan', self.scan_callback, 10)",
+        "is_correct": false,
+        "distractor_rationale": "Hardcoding the default value ignores the runtime parameter entirely. TR-2 explicitly requires reading stop_distance via get_parameter()."
+      }
+    ],
+    "explanation": "The correct implementation reads the float parameter via .get_parameter_value().double_value and creates the subscription with the message type as the first argument. Option B swaps the argument order for create_subscription and fails to extract the float. Option C wraps a Parameter in float() which raises TypeError. Option D ignores the parameter entirely.",
+    "source_excerpt": "create_subscription(msg_type, topic, callback, qos) — message type is the first positional argument. Parameters must be read with .get_parameter_value().double_value for floats.",
+    "source_heading": "ROS 2 Fundamentals > Subscriptions > create_subscription API",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "code_mcq",
+    "code_language": "python"
+  },
+  {
+    "_comment": "Code-Q2b — Bloom: Analyze. ObstacleStopper scan callback: correct inf/nan filtering and Twist logic.",
+    "question": "A developer writes the scan_callback for the ObstacleStopper node. TR-5 requires that inf and nan values in msg.ranges are filtered before computing the minimum.\n\n```python\ndef scan_callback(self, msg):\n    # TODO 2\n    pass\n```\n\nWhich implementation correctly satisfies all requirements?",
+    "options": [
+      {
+        "label": "A",
+        "text": "valid = [r for r in msg.ranges if not math.isnan(r) and not math.isinf(r)]\ntwist = Twist()\nif len(valid) == 0 or min(valid) >= self.stop_dist:\n    twist.linear.x = 0.2\nelse:\n    twist.linear.x = 0.0\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "min_range = min(msg.ranges)\ntwist = Twist()\nif min_range < self.stop_dist:\n    twist.linear.x = 0.0\nelse:\n    twist.linear.x = 0.2\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
+        "is_correct": false,
+        "distractor_rationale": "Does not filter inf/nan values. If msg.ranges contains inf or nan, min() will return nan, causing incorrect comparisons (nan < x is always False in Python)."
+      },
+      {
+        "label": "C",
+        "text": "valid = [r for r in msg.ranges if r > 0]\ntwist = Twist()\nif min(valid) < self.stop_dist:\n    twist.linear.x = 0.0\nelse:\n    twist.linear.x = 0.2\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
+        "is_correct": false,
+        "distractor_rationale": "Filtering r > 0 does not exclude nan or inf values (inf > 0 is True and nan > 0 evaluates to False but for the wrong reason). This does not reliably satisfy TR-5."
+      },
+      {
+        "label": "D",
+        "text": "valid = [r for r in msg.ranges if not math.isnan(r) and not math.isinf(r)]\ntwist = Twist()\nif min(valid) < self.stop_dist:\n    twist.linear.x = 0.0\nelse:\n    twist.linear.x = 0.2\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
+        "is_correct": false,
+        "distractor_rationale": "Correct filtering, but does not handle the edge case where valid is empty (all ranges were inf/nan). Calling min([]) raises ValueError."
+      }
+    ],
+    "explanation": "Option A is the only implementation that: (1) correctly filters using math.isnan and math.isinf, (2) handles the empty-list edge case with len(valid) == 0, and (3) applies the correct stop/move logic. Option B skips filtering. Option C's filter is unreliable for nan/inf. Option D crashes on an empty valid list.",
+    "source_excerpt": "LaserScan.ranges may contain float('inf') for out-of-range readings and float('nan') for invalid returns. Use math.isnan() and math.isinf() to filter them before aggregation.",
+    "source_heading": "ROS 2 Sensors > LaserScan > Handling Invalid Range Values",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "code_mcq",
+    "code_language": "python"
+  },
+  {
+    "_comment": "Code-Q3a — Bloom: Apply. WaypointNavigator: correct yaw-to-quaternion conversion in make_pose.",
+    "question": "A developer is implementing make_pose() for the WaypointNavigator node. TR-3 specifies the quaternion formula: qz = sin(yaw/2), qw = cos(yaw/2), qx = qy = 0.0.\n\n```python\ndef make_pose(self, x, y, yaw):\n    # TODO 2: Build and return a PoseStamped\n    pass\n```\n\nWhich implementation correctly constructs the PoseStamped with the right quaternion?",
+    "options": [
+      {
+        "label": "A",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'map'\npose.header.stamp = self.get_clock().now().to_msg()\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.position.z = 0.0\npose.pose.orientation.z = math.sin(yaw / 2)\npose.pose.orientation.w = math.cos(yaw / 2)\nreturn pose",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'map'\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.orientation.z = math.sin(yaw)\npose.pose.orientation.w = math.cos(yaw)\nreturn pose",
+        "is_correct": false,
+        "distractor_rationale": "Uses sin(yaw) and cos(yaw) instead of sin(yaw/2) and cos(yaw/2). This produces an incorrect quaternion that does not represent the intended rotation. Also omits the stamp."
+      },
+      {
+        "label": "C",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'map'\npose.header.stamp = self.get_clock().now().to_msg()\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.orientation.x = math.sin(yaw / 2)\npose.pose.orientation.w = math.cos(yaw / 2)\nreturn pose",
+        "is_correct": false,
+        "distractor_rationale": "Sets orientation.x instead of orientation.z for the sin(yaw/2) component. For a 2D rotation about the Z-axis, only qz and qw are non-zero."
+      },
+      {
+        "label": "D",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'odom'\npose.header.stamp = self.get_clock().now().to_msg()\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.orientation.z = math.sin(yaw / 2)\npose.pose.orientation.w = math.cos(yaw / 2)\nreturn pose",
+        "is_correct": false,
+        "distractor_rationale": "Sets frame_id to 'odom' instead of 'map'. Nav2 navigation goals must be given in the 'map' frame; an 'odom' frame goal will cause a TF lookup failure."
+      }
+    ],
+    "explanation": "For a 2D yaw rotation, the quaternion components are qx=0, qy=0, qz=sin(yaw/2), qw=cos(yaw/2). The frame_id must be 'map' for Nav2 goals. Option B uses wrong formula. Option C sets orientation.x instead of orientation.z. Option D uses the wrong frame.",
+    "source_excerpt": "Nav2 PoseStamped goals must use frame_id='map'. Yaw to quaternion conversion for 2D: qz=sin(yaw/2), qw=cos(yaw/2), qx=qy=0.",
+    "source_heading": "Nav2 > Simple Commander API > PoseStamped Goals",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "code_mcq",
+    "code_language": "python"
+  },
+  {
+    "_comment": "Code-Q3b — Bloom: Analyze. WaypointNavigator: correct mission loop with failure handling.",
+    "question": "A developer implements run_mission() for the WaypointNavigator. The node must navigate to each waypoint in sequence and log 'Goal failed. Aborting.' if any single goal fails.\n\n```python\ndef run_mission(self):\n    # TODO 3: Loop over WAYPOINTS, send goals, check results\n    pass\n```\n\nWhich implementation correctly satisfies all requirements including failure handling?",
+    "options": [
+      {
+        "label": "A",
+        "text": "for wp in WAYPOINTS:\n    goal = self.make_pose(wp['x'], wp['y'], wp['yaw'])\n    self.navigator.goToPose(goal)\n    while not self.navigator.isTaskComplete():\n        pass\n    result = self.navigator.getResult()\n    if result != TaskResult.SUCCEEDED:\n        self.get_logger().info('Goal failed. Aborting.')\n        return\nself.get_logger().info('All waypoints reached.')",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "for wp in WAYPOINTS:\n    goal = self.make_pose(wp['x'], wp['y'], wp['yaw'])\n    self.navigator.goToPose(goal)\n    result = self.navigator.getResult()\n    if result != TaskResult.SUCCEEDED:\n        self.get_logger().info('Goal failed. Aborting.')\n        return\nself.get_logger().info('All waypoints reached.')",
+        "is_correct": false,
+        "distractor_rationale": "Calls getResult() immediately after goToPose() without polling isTaskComplete(). goToPose() is non-blocking; getResult() called before completion returns an undefined or stale result."
+      },
+      {
+        "label": "C",
+        "text": "for wp in WAYPOINTS:\n    goal = self.make_pose(wp['x'], wp['y'], wp['yaw'])\n    self.navigator.goToPose(goal)\n    while not self.navigator.isTaskComplete():\n        pass\n    result = self.navigator.getResult()\nif result != TaskResult.SUCCEEDED:\n    self.get_logger().info('Goal failed. Aborting.')\n    return\nself.get_logger().info('All waypoints reached.')",
+        "is_correct": false,
+        "distractor_rationale": "The result check is outside the for loop — only the last waypoint's result is ever checked. A failure on WP-1 or WP-2 would be silently ignored and the robot would continue."
+      },
+      {
+        "label": "D",
+        "text": "goals = [self.make_pose(wp['x'], wp['y'], wp['yaw']) for wp in WAYPOINTS]\nself.navigator.followWaypoints(goals)\nwhile not self.navigator.isTaskComplete():\n    pass\nif self.navigator.getResult() != TaskResult.SUCCEEDED:\n    self.get_logger().info('Goal failed. Aborting.')\nelse:\n    self.get_logger().info('All waypoints reached.')",
+        "is_correct": false,
+        "distractor_rationale": "Uses followWaypoints() which does not allow per-waypoint failure detection and early abort. The spec requires stopping immediately on the first failed goal, which followWaypoints() cannot provide."
+      }
+    ],
+    "explanation": "The correct implementation polls isTaskComplete() before reading the result (goToPose is non-blocking), checks the result inside the loop so individual waypoint failures are caught, and returns immediately on failure. Option B skips polling. Option C checks result outside the loop. Option D uses followWaypoints() which prevents per-waypoint failure detection.",
+    "source_excerpt": "BasicNavigator.goToPose() is non-blocking. You must poll isTaskComplete() before calling getResult(). For per-waypoint failure handling, check the result inside the loop after each goal.",
+    "source_heading": "Nav2 > Simple Commander API > goToPose and getResult",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "code_mcq",
+    "code_language": "python"
+  }
+]

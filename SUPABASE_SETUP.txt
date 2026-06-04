@@ -1,0 +1,531 @@
+================================================================
+  MCQ Pipeline — Supabase Setup Guide  (Schema v2)
+================================================================
+  Project : NxtWave MCQ Agent
+  Last updated : 2026-06-04
+  Who this is for : anyone setting up or managing the Supabase
+                    cloud database for this project from scratch.
+================================================================
+
+
+----------------------------------------------------------------
+SECTION 1 — WHAT THIS FILE COVERS
+----------------------------------------------------------------
+
+This guide covers:
+  A. Fresh setup   — new Supabase project, no existing data
+  B. Upgrade       — existing v1 project being upgraded to v2
+  C. Daily use     — adding tags, running queries, troubleshooting
+
+The MCQ pipeline stores questions in TWO places:
+  1. SQLite  (logs/runs.db)  — local, authoritative, keeps everything
+  2. Supabase                — cloud, deduplicated, query-friendly bank
+
+Supabase is OPTIONAL. SQLite always runs. Enable Supabase by setting
+enable_supabase: true in config.yaml.
+
+
+----------------------------------------------------------------
+SECTION 2 — PREREQUISITES
+----------------------------------------------------------------
+
+  [ ] A Supabase account — free tier is enough (supabase.com)
+  [ ] A Supabase project created (any region, any name)
+  [ ] Access to the Supabase SQL Editor (Dashboard → SQL Editor)
+  [ ] The project's .env file open and ready to edit
+
+You will need two values from the Supabase dashboard:
+
+  Project URL  →  Settings → Data API → Project URL
+                  Looks like: https://xyzxyzxyz.supabase.co
+
+  Secret key   →  Settings → API Keys → Secret (service_role) key
+                  Starts with: eyJhbGci...
+                  !! Use the SECRET key, NOT the Publishable (anon) key !!
+                  The anon key is blocked by Row Level Security (403 error).
+
+Add them to your .env file:
+  SUPABASE_URL=https://your-project-id.supabase.co
+  SUPABASE_KEY=eyJhbGci...your-service-role-key...
+
+Then in config.yaml set:
+  enable_supabase: true
+
+
+----------------------------------------------------------------
+SECTION 3 — FRESH SETUP (new Supabase project)
+----------------------------------------------------------------
+
+Step 1: Open the SQL Editor
+  Dashboard → SQL Editor → New query
+
+Step 2: Paste the ENTIRE BLOCK from SECTION 5 below and click Run.
+  You should see "Success. No rows returned." for each statement.
+
+Step 3: Verify the tables were created:
+  Dashboard → Table Editor — you should see:
+    runs, run_tags, mcqs, mcq_tags, concept_maps
+
+Step 4: Verify the view was created:
+  SQL Editor → run:
+    SELECT * FROM v_questions LIMIT 1;
+  (Returns 0 rows on a fresh database — that is correct.)
+
+Step 5: Add your credentials to .env and set enable_supabase: true
+  in config.yaml (see Section 2 above).
+
+Step 6: Run a test generation:
+  mcq-agent generate examples/sample_lesson.md --count 3
+
+Step 7: Confirm data arrived:
+  SQL Editor → run:
+    SELECT run_id, topic, generation_label, passed_count FROM runs;
+
+
+----------------------------------------------------------------
+SECTION 4 — UPGRADING FROM v1 SCHEMA
+----------------------------------------------------------------
+
+If you already have a Supabase project with the old schema
+(runs + mcqs + concept_maps, no run_tags, no new columns),
+DO NOT run the fresh-setup SQL — it will fail on existing tables.
+
+Instead, run the MIGRATION BLOCK from SECTION 6 below.
+
+What the migration does:
+  - Adds the new columns to runs and mcqs (safe, non-destructive)
+  - Backfills generation_label and source_lesson from existing data
+  - Backfills promoted columns (difficulty, bloom_level, etc.)
+    from the existing mcq_json JSONB blobs
+  - Backfills quality_score (100 for accepted, computed for rejected)
+  - Creates the run_tags and mcq_tags tables
+  - Creates the v_questions view
+  - Creates all new indexes
+
+Your existing data is NOT changed or deleted.
+The mcq_json blob is NOT touched.
+
+After running the migration, verify with:
+  SELECT run_id, topic, generation_label, source_lesson FROM runs LIMIT 5;
+  SELECT id, difficulty, bloom_level, quality_score FROM mcqs LIMIT 5;
+
+
+----------------------------------------------------------------
+SECTION 5 — FRESH SETUP SQL
+  (Run this on a NEW Supabase project with no existing tables)
+----------------------------------------------------------------
+
+Copy everything between the === markers and paste into SQL Editor.
+
+===BEGIN FRESH SETUP SQL===
+
+-- RUNS
+CREATE TABLE IF NOT EXISTS runs (
+    run_id               TEXT        PRIMARY KEY,
+    timestamp            TIMESTAMPTZ NOT NULL,
+    input_file           TEXT        NOT NULL,
+    config_json          JSONB       NOT NULL,
+    generated_count      INTEGER     NOT NULL,
+    passed_count         INTEGER     NOT NULL,
+    total_input_tokens   INTEGER     NOT NULL,
+    total_output_tokens  INTEGER     NOT NULL,
+    cost_usd             REAL        NOT NULL,
+    generation_number    INTEGER     NOT NULL DEFAULT 0,
+    generation_label     TEXT,
+    topic                TEXT,
+    source_lesson        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_generation_label ON runs (generation_label);
+CREATE INDEX IF NOT EXISTS idx_runs_topic            ON runs (topic);
+CREATE INDEX IF NOT EXISTS idx_runs_source_lesson    ON runs (source_lesson);
+
+-- RUN_TAGS
+CREATE TABLE IF NOT EXISTS run_tags (
+    run_id    TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+    tag_key   TEXT NOT NULL,
+    tag_value TEXT NOT NULL,
+    PRIMARY KEY (run_id, tag_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_tags_key_value ON run_tags (tag_key, tag_value);
+
+-- MCQS
+CREATE TABLE IF NOT EXISTS mcqs (
+    id               BIGSERIAL   PRIMARY KEY,
+    run_id           TEXT        NOT NULL REFERENCES runs(run_id),
+    mcq_json         JSONB       NOT NULL,
+    passed           INTEGER     NOT NULL,
+    critique_json    JSONB,
+    question_number  INTEGER,
+    difficulty       TEXT,
+    bloom_level      TEXT,
+    question_type    TEXT,
+    stem_pattern     TEXT,
+    source_heading   TEXT,
+    quality_score    REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcqs_run_id          ON mcqs (run_id);
+CREATE INDEX IF NOT EXISTS idx_mcqs_passed          ON mcqs (passed);
+CREATE INDEX IF NOT EXISTS idx_mcqs_question_number ON mcqs (question_number);
+CREATE INDEX IF NOT EXISTS idx_mcqs_difficulty      ON mcqs (difficulty);
+CREATE INDEX IF NOT EXISTS idx_mcqs_bloom_level     ON mcqs (bloom_level);
+CREATE INDEX IF NOT EXISTS idx_mcqs_question_type   ON mcqs (question_type);
+CREATE INDEX IF NOT EXISTS idx_mcqs_quality_score   ON mcqs (quality_score);
+CREATE INDEX IF NOT EXISTS idx_mcqs_source_heading  ON mcqs (source_heading);
+
+-- MCQ_TAGS
+CREATE TABLE IF NOT EXISTS mcq_tags (
+    mcq_id    BIGINT NOT NULL REFERENCES mcqs(id) ON DELETE CASCADE,
+    tag_key   TEXT   NOT NULL,
+    tag_value TEXT   NOT NULL,
+    PRIMARY KEY (mcq_id, tag_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcq_tags_key_value ON mcq_tags (tag_key, tag_value);
+
+-- CONCEPT_MAPS
+CREATE TABLE IF NOT EXISTS concept_maps (
+    file_hash         TEXT        PRIMARY KEY,
+    source_file       TEXT        NOT NULL,
+    analyzer_model    TEXT        NOT NULL,
+    created_at        TIMESTAMPTZ NOT NULL,
+    concept_map_json  JSONB       NOT NULL
+);
+
+-- v_questions VIEW
+CREATE OR REPLACE VIEW v_questions AS
+SELECT
+    m.id                           AS mcq_id,
+    m.question_number,
+    m.passed,
+    m.difficulty,
+    m.bloom_level,
+    m.question_type,
+    m.stem_pattern,
+    m.source_heading,
+    m.quality_score,
+    r.run_id,
+    r.generation_number,
+    r.generation_label,
+    r.topic,
+    r.source_lesson,
+    r.timestamp                    AS generated_at,
+    m.mcq_json
+FROM mcqs m
+JOIN runs r ON m.run_id = r.run_id;
+
+===END FRESH SETUP SQL===
+
+
+----------------------------------------------------------------
+SECTION 6 — MIGRATION SQL
+  (Run this on an EXISTING v1 Supabase project)
+----------------------------------------------------------------
+
+Copy everything between the === markers and paste into SQL Editor.
+
+===BEGIN MIGRATION SQL===
+
+-- Step 1: Add new columns to runs (safe — IF NOT EXISTS on each)
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS generation_label TEXT;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS topic            TEXT;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS source_lesson    TEXT;
+
+-- Step 2: Add new columns to mcqs
+ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS difficulty     TEXT;
+ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS bloom_level    TEXT;
+ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS question_type  TEXT;
+ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS stem_pattern   TEXT;
+ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS source_heading TEXT;
+ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS quality_score  REAL;
+
+-- Step 3: Create run_tags table
+CREATE TABLE IF NOT EXISTS run_tags (
+    run_id    TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+    tag_key   TEXT NOT NULL,
+    tag_value TEXT NOT NULL,
+    PRIMARY KEY (run_id, tag_key)
+);
+CREATE INDEX IF NOT EXISTS idx_run_tags_key_value ON run_tags (tag_key, tag_value);
+
+-- Step 4: Create mcq_tags table
+CREATE TABLE IF NOT EXISTS mcq_tags (
+    mcq_id    BIGINT NOT NULL REFERENCES mcqs(id) ON DELETE CASCADE,
+    tag_key   TEXT   NOT NULL,
+    tag_value TEXT   NOT NULL,
+    PRIMARY KEY (mcq_id, tag_key)
+);
+CREATE INDEX IF NOT EXISTS idx_mcq_tags_key_value ON mcq_tags (tag_key, tag_value);
+
+-- Step 5: Backfill runs columns from existing data
+UPDATE runs SET
+    generation_label = TO_CHAR(timestamp AT TIME ZONE 'UTC', 'YYYYMMDD-HH24MI'),
+    source_lesson    = regexp_replace(
+                           regexp_replace(input_file, '^.*[/\\]', ''),
+                           '\.[^.]+$', ''
+                       )
+WHERE generation_label IS NULL;
+
+-- Step 6: Backfill promoted MCQ columns from existing mcq_json blobs
+UPDATE mcqs SET
+    difficulty     = mcq_json->>'difficulty',
+    bloom_level    = mcq_json->>'bloom_level',
+    question_type  = mcq_json->>'question_type',
+    stem_pattern   = mcq_json->>'stem_pattern',
+    source_heading = mcq_json->>'source_heading'
+WHERE difficulty IS NULL;
+
+-- Step 7: Backfill quality_score
+--   Accepted questions (passed=1) score 100.
+--   Rejected questions score (sum of 12 criteria / 12) * 100.
+UPDATE mcqs SET
+    quality_score = CASE
+        WHEN passed = 1 THEN 100.0
+        WHEN critique_json IS NOT NULL THEN
+            ROUND(
+                (
+                    COALESCE((critique_json->>'matches_marked_answer')::boolean::int, 0) +
+                    COALESCE((critique_json->>'source_grounded')::boolean::int, 0) +
+                    COALESCE((critique_json->>'uniquely_correct')::boolean::int, 0) +
+                    COALESCE((critique_json->>'distractors_plausible')::boolean::int, 0) +
+                    COALESCE((critique_json->>'matches_difficulty')::boolean::int, 0) +
+                    COALESCE((critique_json->>'on_topic')::boolean::int, 0) +
+                    COALESCE((critique_json->>'clear_wording')::boolean::int, 0) +
+                    COALESCE((critique_json->>'self_contained')::boolean::int, 0) +
+                    COALESCE((critique_json->>'stem_quality')::boolean::int, 0) +
+                    COALESCE((critique_json->>'stem_economy')::boolean::int, 0) +
+                    COALESCE((critique_json->>'length_parity')::boolean::int, 0) +
+                    COALESCE((critique_json->>'source_phrase_independence')::boolean::int, 0)
+                )::numeric / 12 * 100,
+                1
+            )
+        ELSE NULL
+    END
+WHERE quality_score IS NULL;
+
+-- Step 8: Create new indexes
+CREATE INDEX IF NOT EXISTS idx_runs_generation_label ON runs (generation_label);
+CREATE INDEX IF NOT EXISTS idx_runs_topic            ON runs (topic);
+CREATE INDEX IF NOT EXISTS idx_runs_source_lesson    ON runs (source_lesson);
+CREATE INDEX IF NOT EXISTS idx_mcqs_difficulty       ON mcqs (difficulty);
+CREATE INDEX IF NOT EXISTS idx_mcqs_bloom_level      ON mcqs (bloom_level);
+CREATE INDEX IF NOT EXISTS idx_mcqs_question_type    ON mcqs (question_type);
+CREATE INDEX IF NOT EXISTS idx_mcqs_quality_score    ON mcqs (quality_score);
+CREATE INDEX IF NOT EXISTS idx_mcqs_source_heading   ON mcqs (source_heading);
+
+-- Step 9: Create (or replace) the v_questions view
+CREATE OR REPLACE VIEW v_questions AS
+SELECT
+    m.id                           AS mcq_id,
+    m.question_number,
+    m.passed,
+    m.difficulty,
+    m.bloom_level,
+    m.question_type,
+    m.stem_pattern,
+    m.source_heading,
+    m.quality_score,
+    r.run_id,
+    r.generation_number,
+    r.generation_label,
+    r.topic,
+    r.source_lesson,
+    r.timestamp                    AS generated_at,
+    m.mcq_json
+FROM mcqs m
+JOIN runs r ON m.run_id = r.run_id;
+
+===END MIGRATION SQL===
+
+
+----------------------------------------------------------------
+SECTION 7 — QUERY EXAMPLES
+----------------------------------------------------------------
+
+All examples query through v_questions (the recommended interface).
+The mcq_json column always returns the full original question JSON.
+
+-- 1. All accepted questions on a topic
+SELECT question_number, difficulty, bloom_level, source_heading, mcq_json
+FROM v_questions
+WHERE topic ILIKE '%MQTT%'
+  AND passed = 1
+ORDER BY question_number;
+
+-- 2. All questions from a specific generation
+SELECT question_number, difficulty, quality_score, mcq_json
+FROM v_questions
+WHERE generation_label = '20260604-1423'
+  AND passed = 1;
+
+-- 3. Hard questions only
+SELECT question_number, bloom_level, topic, mcq_json
+FROM v_questions
+WHERE difficulty = 'hard'
+  AND passed = 1
+ORDER BY quality_score DESC;
+
+-- 4. High-quality questions (quality >= 90) — useful for curated sets
+SELECT question_number, difficulty, bloom_level, topic, mcq_json
+FROM v_questions
+WHERE quality_score >= 90
+  AND passed = 1
+ORDER BY quality_score DESC;
+
+-- 5. Apply-level questions across all lessons
+SELECT question_number, topic, source_heading, mcq_json
+FROM v_questions
+WHERE bloom_level = 'apply'
+  AND passed = 1;
+
+-- 6. Questions from a specific course (using run_tags)
+SELECT q.question_number, q.difficulty, q.bloom_level, q.mcq_json
+FROM v_questions q
+JOIN run_tags rt ON q.run_id = rt.run_id
+WHERE rt.tag_key = 'course'
+  AND rt.tag_value = 'Python 101'
+  AND q.passed = 1;
+
+-- 7. Multi-tag filter: course + week + difficulty
+SELECT q.question_number, q.source_heading, q.mcq_json
+FROM v_questions q
+JOIN run_tags rt1 ON q.run_id = rt1.run_id
+JOIN run_tags rt2 ON q.run_id = rt2.run_id
+WHERE rt1.tag_key = 'course' AND rt1.tag_value = 'Python 101'
+  AND rt2.tag_key = 'week'   AND rt2.tag_value = 'Week 3'
+  AND q.difficulty = 'medium'
+  AND q.passed = 1;
+
+-- 8. Questions drawn from a specific section of the source document
+SELECT question_number, topic, mcq_json
+FROM v_questions
+WHERE source_heading ILIKE '%QoS%'
+  AND passed = 1;
+
+-- 9. All available topic labels (to see what's in the bank)
+SELECT DISTINCT topic, COUNT(*) AS question_count
+FROM v_questions
+WHERE passed = 1
+GROUP BY topic
+ORDER BY question_count DESC;
+
+-- 10. Generation history summary
+SELECT generation_label, topic, generation_number,
+       passed_count, cost_usd
+FROM runs
+ORDER BY generation_label DESC;
+
+-- 11. Rejected questions and their quality score (useful for debugging)
+SELECT m.quality_score, m.difficulty, m.bloom_level, m.mcq_json,
+       m.critique_json
+FROM mcqs m
+WHERE m.passed = 0
+  AND m.quality_score < 50
+ORDER BY m.quality_score ASC;
+
+
+----------------------------------------------------------------
+SECTION 8 — ADDING TAGS TO RUNS
+----------------------------------------------------------------
+
+Tags can be added at any time — before or after a generation run.
+
+-- Add a single tag to a run
+INSERT INTO run_tags (run_id, tag_key, tag_value)
+VALUES ('your-run-uuid-here', 'course', 'Python 101')
+ON CONFLICT (run_id, tag_key) DO UPDATE SET tag_value = EXCLUDED.tag_value;
+
+-- Add multiple tags to a run in one statement
+INSERT INTO run_tags (run_id, tag_key, tag_value) VALUES
+    ('your-run-uuid-here', 'course', 'Python 101'),
+    ('your-run-uuid-here', 'unit',   'Unit 3 — Functions'),
+    ('your-run-uuid-here', 'week',   'Week 7')
+ON CONFLICT (run_id, tag_key) DO UPDATE SET tag_value = EXCLUDED.tag_value;
+
+-- Find run_ids to tag (use this to look up runs first)
+SELECT run_id, topic, generation_label, passed_count
+FROM runs
+ORDER BY generation_label DESC
+LIMIT 20;
+
+-- Remove a tag
+DELETE FROM run_tags
+WHERE run_id = 'your-run-uuid-here'
+  AND tag_key = 'week';
+
+-- List all tags on a run
+SELECT tag_key, tag_value
+FROM run_tags
+WHERE run_id = 'your-run-uuid-here';
+
+-- See all unique tag keys in use (to know what dimensions exist)
+SELECT DISTINCT tag_key, COUNT(*) AS uses
+FROM run_tags
+GROUP BY tag_key
+ORDER BY uses DESC;
+
+-- Add a tag to a specific MCQ (mcq_tags — use sparingly)
+INSERT INTO mcq_tags (mcq_id, tag_key, tag_value)
+VALUES (42, 'flagged', 'needs-review')
+ON CONFLICT (mcq_id, tag_key) DO UPDATE SET tag_value = EXCLUDED.tag_value;
+
+
+----------------------------------------------------------------
+SECTION 9 — SETTING THE TOPIC AT GENERATION TIME
+----------------------------------------------------------------
+
+The --topic flag is optional on the CLI. If you omit it, the pipeline
+automatically derives the topic from the filename in title case:
+
+  mqtt_protocol_lesson.md  →  "Mqtt Protocol Lesson"
+
+To set a clean topic label explicitly:
+
+  mcq-agent generate examples/mqtt_lesson.md --count 10 --topic "MQTT Protocol"
+  mcq-agent generate lessons/python_funcs.md --count 15 --topic "Python Functions"
+  mcq-agent generate content/iot_sensors.md  --count 10 --topic "IoT Sensors"
+
+The topic is stored in runs.topic and is immediately queryable via v_questions.
+
+
+----------------------------------------------------------------
+SECTION 10 — TROUBLESHOOTING
+----------------------------------------------------------------
+
+Problem : "permission denied" or 403 error connecting to Supabase
+Fix     : You are using the anon key. Replace SUPABASE_KEY in .env with
+          the SECRET (service_role) key from Settings → API Keys.
+
+Problem : columns difficulty / bloom_level / generation_label are NULL
+          in existing rows after migration
+Fix     : Re-run Steps 5, 6, 7 of the Migration SQL (Section 6).
+          They use WHERE ... IS NULL so they are safe to re-run.
+
+Problem : run_tags or mcq_tags table does not exist
+Fix     : Run Steps 3 and 4 of the Migration SQL (Section 6).
+
+Problem : v_questions view returns "relation does not exist"
+Fix     : Run Step 9 of the Migration SQL to create the view.
+
+Problem : topic column is NULL for old runs
+Fix     : Update manually in the SQL Editor:
+            UPDATE runs SET topic = 'Your Topic'
+            WHERE run_id = 'your-run-uuid-here';
+          Or apply a bulk update using source_lesson as a guide:
+            UPDATE runs
+            SET topic = REPLACE(INITCAP(source_lesson), '_', ' ')
+            WHERE topic IS NULL;
+
+Problem : quality_score is NULL for some accepted questions
+Fix     : These rows were inserted before the v2 upgrade.
+          Re-run Step 7 of the Migration SQL — it skips rows that
+          already have a value (WHERE quality_score IS NULL).
+
+Problem : supabase module not found
+Fix     : pip install "supabase>=2.3.0"
+
+================================================================
+  End of SUPABASE_SETUP.txt
+================================================================

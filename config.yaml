@@ -1,0 +1,104 @@
+# ============================================================
+#  MCQ Agent — application configuration  (v0.6 production)
+#  All stages use google/gemini-2.5-flash via OpenRouter.
+# ============================================================
+
+# ---- Provider ---------------------------------------------------
+provider: openrouter
+model: google/gemini-2.5-flash
+
+# ---- Per-stage model overrides ----------------------------------
+# All three stages use the same model for simplicity and compatibility.
+# Analyzer result is cached after the first run — cost is incurred once only.
+
+analyzer_provider: openrouter
+analyzer_model: google/gemini-2.5-flash
+
+generator_provider: openrouter
+generator_model: google/gemini-2.5-flash
+
+critic_provider: openrouter
+critic_model: google/gemini-2.5-flash
+
+# ---- Question generation ----------------------------------------
+num_questions: 10
+difficulty: medium
+question_type: single_correct
+num_options: 4
+include_explanations: true
+topic_filter: null
+over_generation_factor: 2.0
+max_regeneration_attempts: 1
+# Generate a mix of single_correct, ordering, and code-snippet-based questions.
+# Ordering questions test step-sequencing (procedures, setup workflows).
+# Code-snippet questions embed a code block in the stem (debugging/scenario patterns).
+mixed_question_types: true
+
+# ---- Quality control --------------------------------------------
+# Lowered from 0.85 — large documents with T2 truncation produce
+# source excerpts that match the original at ~0.65–0.75. Setting
+# this too high causes all questions to fail validator on first pass.
+source_grounding_threshold: 0.65
+
+# ---- LLM temperatures per stage ---------------------------------
+temperature: 0.7
+critic_temperature: 0.2
+analyzer_temperature: 0.2
+
+# ---- Per-stage token budgets ------------------------------------
+# Generator: 150 questions × 2.0 factor = 300 candidates per full pass.
+# Each batch generates ~30-40 questions. Budget must cover that output.
+max_tokens: 32000           # generator — large batches for 150q runs
+critic_max_tokens: 4000     # critic — single MCQ evaluation
+analyzer_max_tokens: 20000  # analyzer — 70-page document ConceptMap
+
+# ---- Guarantee-n accepted questions -----------------------------
+guarantee_n_retries: 20
+
+# ---- Source linter thresholds -----------------------------------
+linter_min_words: 300
+linter_min_sections: 2
+linter_min_words_per_section: 50
+linter_min_concept_density: 0.3
+linter_fail_on_warn: false
+
+# ---- Retry / rate-limit -----------------------------------------
+api_max_retries: 3
+api_retry_initial_backoff: 2.0
+
+# ---- Pricing (USD per 1M tokens; cost reporting only) -----------
+# google/gemini-2.5-flash via OpenRouter
+pricing:
+  input_per_million_tokens: 0.15
+  output_per_million_tokens: 0.60
+
+generator_pricing:
+  input_per_million_tokens: 0.15
+  output_per_million_tokens: 0.60
+
+critic_pricing:
+  input_per_million_tokens: 0.15
+  output_per_million_tokens: 0.60
+
+# ---- Cloud storage (Supabase) -----------------------------------
+# Step 1: Create an account at https://supabase.com and create a project.
+# Step 2: Run supabase_schema.sql in the Supabase SQL editor.
+# Step 3: Add SUPABASE_URL and SUPABASE_KEY to your .env file.
+# Step 4: Set enable_supabase to true below.
+enable_supabase: false
+# Similarity threshold for the automated gate (0-100). Questions scoring at or
+# above this value are dropped as duplicates before reaching Supabase.
+# Lower = stricter. Must match your intent in check_similarity.py --threshold.
+supabase_similarity_threshold: 80
+
+# ---- Output -----------------------------------------------------
+output_format: json
+include_rejected_in_output: false
+
+# ---- Logging ----------------------------------------------------
+log_level: INFO
+log_db_path: logs/runs.db
+
+# ---- Paths ------------------------------------------------------
+prompts_dir: prompts
+few_shot_examples_file: prompts/few_shot_examples.json

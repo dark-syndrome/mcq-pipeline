@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcq-agent"
+version = "0.2.0"
+description = "AI-powered MCQ generation pipeline with multi-provider LLM support and Supabase cloud storage"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Mustaeen" }]
+dependencies = [
+    "groq>=0.11.0",
+    "anthropic>=0.39.0",
+    "instructor>=1.4.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+    "click>=8.1.0",
+    "PyYAML>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "markdown-it-py>=3.0.0",
+    "rapidfuzz>=3.6.0",
+    "tenacity>=8.2.0",
+    "structlog>=24.1.0",
+]
+
+[project.optional-dependencies]
+cloud = ["supabase>=2.3.0"]
+
+[project.scripts]
+mcq-agent = "mcq_agent.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mcq_agent*"]
+
+[tool.setuptools.package-data]
+mcq_agent = ["prompts/*.txt", "prompts/*.json"]

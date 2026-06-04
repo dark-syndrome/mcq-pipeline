@@ -1,0 +1,1321 @@
+[
+  {
+    "_comment": "EASY-1 | remember | single_correct | definition | GPIO voltage",
+    "question": "Which of the following is the standard voltage level for GPIO pins on the ESP32-S3?",
+    "options": [
+      {
+        "label": "A",
+        "text": "1.8 V",
+        "is_correct": false,
+        "distractor_rationale": "Some low-power MCUs use 1.8 V logic; students new to ESP32 may confuse it with other chips."
+      },
+      {
+        "label": "B",
+        "text": "3.3 V",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "5 V",
+        "is_correct": false,
+        "distractor_rationale": "Arduino Uno uses 5 V logic \u2014 a very common source of confusion when moving platforms."
+      },
+      {
+        "label": "D",
+        "text": "12 V",
+        "is_correct": false,
+        "distractor_rationale": "12 V is typical for motor drivers and external supplies, not logic-level GPIO."
+      }
+    ],
+    "explanation": "ESP32-S3 GPIO pins operate at 3.3 V. Applying 5 V directly will damage the chip.",
+    "source_excerpt": "The ESP32-S3 GPIO pins operate at 3.3 V; do not apply 5 V signals directly.",
+    "source_heading": "ESP32-S3 Hardware > GPIO Specifications",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-2 | remember | single_correct | definition | MQTT broker role",
+    "question": "In an MQTT network, what is the role of the broker?",
+    "options": [
+      {
+        "label": "A",
+        "text": "It stores sensor data in a relational database for later retrieval.",
+        "is_correct": false,
+        "distractor_rationale": "Students often confuse a message broker with a time-series database used alongside it."
+      },
+      {
+        "label": "B",
+        "text": "It receives messages from publishers and forwards them to matching subscribers.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "It directly polls each device on the network and collects readings.",
+        "is_correct": false,
+        "distractor_rationale": "Describes a request-response polling model, which is the opposite of pub-sub."
+      },
+      {
+        "label": "D",
+        "text": "It assigns IP addresses to IoT devices on the local network.",
+        "is_correct": false,
+        "distractor_rationale": "Describes a DHCP server, not a message broker."
+      }
+    ],
+    "explanation": "The broker is the central relay in MQTT. Publishers send messages tagged with topics; the broker routes copies to all clients subscribed to those topics.",
+    "source_excerpt": "The broker receives all published messages and forwards them to clients that have subscribed to the matching topic.",
+    "source_heading": "Communication Protocols > MQTT > Architecture",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-3 | understand | single_correct | definition | pub-sub decoupling",
+    "question": "What does the 'publish-subscribe' model in MQTT mean?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Devices send messages directly to one another after subscribing to a peer list.",
+        "is_correct": false,
+        "distractor_rationale": "Confuses pub-sub with peer-to-peer; students miss the broker's decoupling role."
+      },
+      {
+        "label": "B",
+        "text": "Devices publish messages to topics on a broker, and other devices subscribe to those topics to receive them.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "A central server polls each device on a fixed schedule and publishes results.",
+        "is_correct": false,
+        "distractor_rationale": "Describes polling \u2014 the pattern that pub-sub was designed to replace."
+      },
+      {
+        "label": "D",
+        "text": "Devices subscribe to a paid messaging service and publish reports to it.",
+        "is_correct": false,
+        "distractor_rationale": "Takes 'publish' and 'subscribe' too literally in a commercial sense."
+      }
+    ],
+    "explanation": "In MQTT pub-sub, publishers and subscribers never communicate directly. The broker decouples them by routing messages based on topic strings.",
+    "source_excerpt": "MQTT uses a publish-subscribe architecture: clients publish messages to topics on a broker, and other clients subscribe to topics to receive matching messages.",
+    "source_heading": "Communication Protocols > MQTT",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-4 | remember | single_correct | definition | QoS 0 behaviour",
+    "question": "What delivery guarantee does MQTT QoS level 0 provide?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The message is delivered at least once, with possible duplicates.",
+        "is_correct": false,
+        "distractor_rationale": "Describes QoS 1, not QoS 0; students confuse the levels."
+      },
+      {
+        "label": "B",
+        "text": "The message is delivered exactly once with a two-step confirmation.",
+        "is_correct": false,
+        "distractor_rationale": "Describes QoS 2 \u2014 the most expensive delivery guarantee."
+      },
+      {
+        "label": "C",
+        "text": "The message is delivered at most once with no acknowledgement.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "The message is queued until the subscriber comes online and then delivered once.",
+        "is_correct": false,
+        "distractor_rationale": "Describes persistent session behaviour, which is a separate feature from QoS level."
+      }
+    ],
+    "explanation": "QoS 0 is 'fire and forget'. The broker sends the message once and does not track whether it arrived. It is the cheapest in bandwidth but offers no delivery guarantee.",
+    "source_excerpt": "QoS 0: at most once delivery \u2014 the message is sent once and not acknowledged.",
+    "source_heading": "Communication Protocols > MQTT > Quality of Service",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-5 | remember | single_correct | definition | deep sleep purpose",
+    "question": "What is the primary purpose of enabling deep sleep mode on a microcontroller?",
+    "options": [
+      {
+        "label": "A",
+        "text": "To increase the clock frequency when the processor is idle.",
+        "is_correct": false,
+        "distractor_rationale": "The opposite is true; deep sleep reduces clock activity."
+      },
+      {
+        "label": "B",
+        "text": "To reduce power consumption to microamp levels during inactive periods.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "To allow over-the-air firmware updates without interrupting operation.",
+        "is_correct": false,
+        "distractor_rationale": "OTA updates require active Wi-Fi \u2014 incompatible with deep sleep."
+      },
+      {
+        "label": "D",
+        "text": "To prevent data loss by writing RAM contents to flash storage.",
+        "is_correct": false,
+        "distractor_rationale": "Describes a hibernate-and-persist pattern; most MCU deep sleep modes do not automatically persist RAM."
+      }
+    ],
+    "explanation": "Deep sleep powers down all non-essential subsystems, dropping current draw to the microamp range. This is critical for battery-powered IoT devices that spend most of their time idle.",
+    "source_excerpt": "Deep sleep mode reduces current consumption to the low microamp range by powering down the CPU, Wi-Fi, and most peripherals.",
+    "source_heading": "Power Management > Sleep Modes",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-6 | understand | single_correct | definition | actuator vs sensor",
+    "question": "A smoke detector converts air-quality data into an electrical signal. What type of IoT component is it?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Actuator",
+        "is_correct": false,
+        "distractor_rationale": "Actuators produce physical output; students sometimes confuse the two categories."
+      },
+      {
+        "label": "B",
+        "text": "Gateway",
+        "is_correct": false,
+        "distractor_rationale": "A gateway bridges networks; it does not sense the environment."
+      },
+      {
+        "label": "C",
+        "text": "Sensor",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Controller",
+        "is_correct": false,
+        "distractor_rationale": "A controller processes data and makes decisions; it does not directly sense the environment."
+      }
+    ],
+    "explanation": "A sensor converts a physical quantity into an electrical signal. The smoke detector measures air quality and converts that measurement \u2014 making it a sensor.",
+    "source_excerpt": "A sensor converts a physical parameter from the environment into an electrical signal for processing.",
+    "source_heading": "IoT Fundamentals > Components",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-7 | remember | single_correct | definition | I2C address purpose",
+    "question": "Why does every device on an I2C bus require a unique address?",
+    "options": [
+      {
+        "label": "A",
+        "text": "To determine the clock speed at which that device communicates.",
+        "is_correct": false,
+        "distractor_rationale": "Clock speed on I2C is set by the master, not by device address."
+      },
+      {
+        "label": "B",
+        "text": "To allow the master to target a specific device when multiple devices share the same two wires.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "To encrypt the data sent to each device individually.",
+        "is_correct": false,
+        "distractor_rationale": "I2C does not provide encryption; the address is for addressing only."
+      },
+      {
+        "label": "D",
+        "text": "To indicate the voltage level each device expects.",
+        "is_correct": false,
+        "distractor_rationale": "Voltage levels are a hardware concern independent of I2C addressing."
+      }
+    ],
+    "explanation": "I2C is a shared bus \u2014 all devices share SDA and SCL. The address in each transaction tells every device on the bus which one should respond.",
+    "source_excerpt": "Every I2C device has a unique 7-bit address so the master can address individual slaves on the shared bus.",
+    "source_heading": "Communication Protocols > I2C",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "EASY-8 | understand | single_correct | definition | PWM duty cycle",
+    "question": "A PWM signal has a duty cycle of 25%. What does this mean?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The signal frequency is 25 Hz.",
+        "is_correct": false,
+        "distractor_rationale": "Duty cycle and frequency are independent PWM parameters."
+      },
+      {
+        "label": "B",
+        "text": "The signal is HIGH for 25% of each period and LOW for the remaining 75%.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The signal voltage is 25% of the supply voltage.",
+        "is_correct": false,
+        "distractor_rationale": "PWM approximates variable voltage by switching, not by reducing actual voltage at any instant."
+      },
+      {
+        "label": "D",
+        "text": "The device consumes 25% of its rated power.",
+        "is_correct": false,
+        "distractor_rationale": "Power depends on the load and waveform together, not duty cycle alone."
+      }
+    ],
+    "explanation": "Duty cycle is the proportion of one period for which the signal is HIGH. A 25% duty cycle means the output is HIGH for a quarter of each cycle.",
+    "source_excerpt": "Duty cycle is the percentage of time the PWM signal is HIGH within one period.",
+    "source_heading": "Microcontroller Peripherals > PWM",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct",
+    "stem_pattern": "definition"
+  },
+  {
+    "_comment": "MEDIUM-1 | apply | single_correct | scenario | QoS selection",
+    "question": "An ESP32-S3 device must send sensor readings every 5 minutes to a cloud broker over an unreliable mobile network. The device runs on a small battery and must operate for months without recharging. Which communication pattern best meets these requirements?",
+    "options": [
+      {
+        "label": "A",
+        "text": "HTTP POST with retry-on-failure to a REST endpoint",
+        "is_correct": false,
+        "distractor_rationale": "HTTP is connection-oriented and verbose; each request requires a TCP handshake, which is expensive on battery-powered hardware."
+      },
+      {
+        "label": "B",
+        "text": "MQTT QoS 1 with a persistent session to a broker",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "WebSocket connection kept open continuously to the broker",
+        "is_correct": false,
+        "distractor_rationale": "A persistent WebSocket requires the radio to stay active, which would drain the battery far faster than periodic wake-and-transmit."
+      },
+      {
+        "label": "D",
+        "text": "UDP multicast to all devices on the local network",
+        "is_correct": false,
+        "distractor_rationale": "Multicast is for local network broadcast, not cloud communication, and UDP has no delivery guarantee."
+      }
+    ],
+    "explanation": "MQTT QoS 1 guarantees at-least-once delivery and a persistent session allows the broker to queue messages when the device is disconnected. Together these handle unreliable connectivity without keeping the radio permanently on.",
+    "source_excerpt": "MQTT with QoS 1 and persistent sessions is recommended for battery-powered devices on unreliable networks \u2014 the broker queues messages during disconnection and the device can sleep between transmissions.",
+    "source_heading": "Communication Protocols > MQTT > Practical Selection",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "scenario"
+  },
+  {
+    "_comment": "MEDIUM-2 | apply | single_correct | scenario | code reading \u2014 sleep config",
+    "question": "An engineer writes the following code to put an ESP32-S3 to sleep:\n\nesp_sleep_enable_timer_wakeup(30 * 1000000);\nesp_deep_sleep_start();\n\nThe device wakes every 30 seconds as expected, but current draw in sleep is measured at 2.5 mA instead of the expected 10 \u00b5A. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The wakeup timer value is set in milliseconds rather than microseconds, causing the device to wake too frequently.",
+        "is_correct": false,
+        "distractor_rationale": "The timer value of 30 \u00d7 1,000,000 is correct for 30 seconds in microseconds; wakeup interval is fine."
+      },
+      {
+        "label": "B",
+        "text": "A peripheral \u2014 such as Wi-Fi or a UART \u2014 is not explicitly powered down before calling esp_deep_sleep_start().",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Deep sleep cannot be used with a timer wakeup source; the device falls back to light sleep.",
+        "is_correct": false,
+        "distractor_rationale": "Timer wakeup is a supported deep sleep source on ESP32-S3."
+      },
+      {
+        "label": "D",
+        "text": "The supply voltage is too high, causing the sleep current to exceed specification.",
+        "is_correct": false,
+        "distractor_rationale": "Sleep current is largely independent of supply voltage within the rated operating range."
+      }
+    ],
+    "explanation": "On ESP32-S3, peripherals such as Wi-Fi, UART, and I2C retain power unless explicitly disabled before entering deep sleep. Leaving them on is the most common cause of unexpectedly high sleep current.",
+    "source_excerpt": "Before calling esp_deep_sleep_start(), all active peripherals must be explicitly disabled. Leaving Wi-Fi or UART active is the most common cause of elevated sleep current.",
+    "source_heading": "Power Management > Deep Sleep Configuration",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "MEDIUM-3 | apply | single_correct | comparison | I2C vs SPI choice",
+    "question": "A developer needs to connect an OLED display and a temperature sensor to a microcontroller using the fewest possible wires. Both devices support I2C and SPI. Which interface should the developer choose and why?",
+    "options": [
+      {
+        "label": "A",
+        "text": "SPI, because it supports higher data rates and is therefore always preferred for displays.",
+        "is_correct": false,
+        "distractor_rationale": "SPI is faster but requires four wires per device plus chip-select lines \u2014 more wires, not fewer."
+      },
+      {
+        "label": "B",
+        "text": "I2C, because multiple devices share only two wires (SDA and SCL), and each is addressed individually.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "I2C, because it does not require a clock signal and is simpler to implement.",
+        "is_correct": false,
+        "distractor_rationale": "I2C does use a clock line (SCL); this answer describes a one-wire interface incorrectly."
+      },
+      {
+        "label": "D",
+        "text": "SPI, because it allows devices to share a chip-select line and reduces wiring.",
+        "is_correct": false,
+        "distractor_rationale": "Each SPI device requires its own chip-select line; sharing is not supported."
+      }
+    ],
+    "explanation": "I2C uses only SDA and SCL regardless of how many devices are connected. Each device has a unique address, so two devices share the same two wires with no extra lines.",
+    "source_excerpt": "I2C connects multiple devices using only two wires \u2014 SDA and SCL \u2014 with each device identified by a unique address.",
+    "source_heading": "Communication Protocols > I2C vs SPI",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "comparison"
+  },
+  {
+    "_comment": "MEDIUM-4 | apply | single_correct | scenario | MQTT topic design",
+    "question": "A factory deploys 200 sensors across three zones (A, B, C). An operations dashboard needs to display readings from all sensors in Zone B in real time. Which MQTT topic subscription achieves this most efficiently?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Subscribe to factory/+/sensor/# to receive all readings from all zones.",
+        "is_correct": false,
+        "distractor_rationale": "This receives data from all three zones, not just Zone B \u2014 wasteful bandwidth."
+      },
+      {
+        "label": "B",
+        "text": "Subscribe to factory/zoneB/sensor/+ to receive readings from all sensors in Zone B.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Subscribe to factory/# and filter Zone B messages in application code.",
+        "is_correct": false,
+        "distractor_rationale": "Receives all factory data and filters client-side \u2014 inefficient when the broker can filter at source."
+      },
+      {
+        "label": "D",
+        "text": "Subscribe to factory/zoneB/# to receive all zoneB messages including non-sensor topics.",
+        "is_correct": false,
+        "distractor_rationale": "# also matches sub-topics beyond /sensor/, potentially receiving control messages or metadata not needed by the dashboard."
+      }
+    ],
+    "explanation": "The single-level wildcard + matches exactly one topic level. factory/zoneB/sensor/+ matches every sensor in Zone B and nothing else.",
+    "source_excerpt": "The single-level wildcard + matches exactly one topic level. The multi-level wildcard # matches all remaining levels from that point downward.",
+    "source_heading": "Communication Protocols > MQTT > Topic Wildcards",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "scenario"
+  },
+  {
+    "_comment": "MEDIUM-5 | apply | single_correct | procedure | OTA update steps",
+    "question": "A developer is about to push an OTA firmware update to a fleet of 500 deployed ESP32-S3 devices. Before initiating the update, which step is most critical to prevent bricking devices?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Disable all MQTT subscriptions on the devices so the update is not interrupted by incoming messages.",
+        "is_correct": false,
+        "distractor_rationale": "MQTT activity does not interrupt an OTA partition write; this step is unnecessary."
+      },
+      {
+        "label": "B",
+        "text": "Verify the new firmware binary with a cryptographic signature or hash before deploying.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Put all devices into deep sleep to reduce power consumption during the update.",
+        "is_correct": false,
+        "distractor_rationale": "Deep sleep interrupts the update; devices must remain active throughout."
+      },
+      {
+        "label": "D",
+        "text": "Reset the NVS partition on each device to clear stale configuration before the update.",
+        "is_correct": false,
+        "distractor_rationale": "Clearing NVS destroys configuration data; this is not a standard pre-update step."
+      }
+    ],
+    "explanation": "A corrupted or unsigned binary can render devices unresponsive after flashing. Verifying integrity before deployment is the single most important safeguard against mass bricking.",
+    "source_excerpt": "Always verify the firmware binary's integrity with a cryptographic hash or signature before initiating an OTA update to a device fleet.",
+    "source_heading": "Firmware Management > OTA Updates > Best Practices",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "procedure"
+  },
+  {
+    "_comment": "MEDIUM-6 | apply | single_correct | scenario | ADC resolution",
+    "question": "A soil moisture sensor outputs a voltage between 0 V and 3.3 V. An ESP32-S3 reads this with its 12-bit ADC. Approximately how many discrete moisture levels can be distinguished?",
+    "options": [
+      {
+        "label": "A",
+        "text": "256",
+        "is_correct": false,
+        "distractor_rationale": "256 is 2^8 \u2014 the resolution of an 8-bit ADC."
+      },
+      {
+        "label": "B",
+        "text": "1024",
+        "is_correct": false,
+        "distractor_rationale": "1024 is 2^10 \u2014 the resolution of a 10-bit ADC."
+      },
+      {
+        "label": "C",
+        "text": "4096",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "65536",
+        "is_correct": false,
+        "distractor_rationale": "65536 is 2^16 \u2014 a 16-bit ADC. ESP32-S3 has a 12-bit ADC."
+      }
+    ],
+    "explanation": "A 12-bit ADC produces 2^12 = 4096 distinct values across the input range. This determines the finest granularity with which the sensor signal can be represented digitally.",
+    "source_excerpt": "The ESP32-S3 integrates a 12-bit SAR ADC, providing 4096 quantisation levels across the input voltage range.",
+    "source_heading": "Microcontroller Peripherals > ADC",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "scenario"
+  },
+  {
+    "_comment": "MEDIUM-7 | apply | single_correct | debugging | NVS key not found",
+    "question": "An ESP32-S3 application reads a Wi-Fi password from NVS on every boot. After a factory reset, the device panics with 'ESP_ERR_NVS_NOT_FOUND'. What is the correct way to handle this condition?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Catch the error and halt the device, because NVS corruption requires reflashing.",
+        "is_correct": false,
+        "distractor_rationale": "NOT_FOUND means the key was never written, not that NVS is corrupted."
+      },
+      {
+        "label": "B",
+        "text": "Catch the error, fall back to a default value or provisioning mode, and write the key before the next boot.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Retry the NVS read in a loop until the key becomes available.",
+        "is_correct": false,
+        "distractor_rationale": "The key will never appear by retrying if it was never written; this creates an infinite loop."
+      },
+      {
+        "label": "D",
+        "text": "Erase the entire NVS partition and restart to resolve the error.",
+        "is_correct": false,
+        "distractor_rationale": "Erasing NVS destroys all stored data; the correct response is to provision the missing key."
+      }
+    ],
+    "explanation": "ESP_ERR_NVS_NOT_FOUND indicates the key does not yet exist in storage \u2014 typical after a factory reset. The application should handle it gracefully by entering a provisioning flow rather than treating it as a fatal error.",
+    "source_excerpt": "If nvs_get_str returns ESP_ERR_NVS_NOT_FOUND, the key has not yet been written. Handle this case by entering provisioning mode rather than treating it as a fatal error.",
+    "source_heading": "Storage > NVS > Error Handling",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "MEDIUM-8 | apply | single_correct | code-reading | FreeRTOS task creation",
+    "question": "A developer creates two FreeRTOS tasks:\n\nxTaskCreate(sensorTask, 'Sensor', 2048, NULL, 2, NULL);\nxTaskCreate(publishTask, 'Publish', 4096, NULL, 1, NULL);\n\nBoth tasks are ready to run simultaneously. Which task will the scheduler execute first?",
+    "options": [
+      {
+        "label": "A",
+        "text": "sensorTask, because it was created first and is therefore at the front of the ready queue.",
+        "is_correct": false,
+        "distractor_rationale": "FreeRTOS uses priority-based scheduling, not creation order."
+      },
+      {
+        "label": "B",
+        "text": "publishTask, because it has a larger stack size and is therefore considered more important.",
+        "is_correct": false,
+        "distractor_rationale": "Stack size has no bearing on scheduling priority."
+      },
+      {
+        "label": "C",
+        "text": "sensorTask, because it has the higher priority value (2 > 1).",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Both tasks run simultaneously because FreeRTOS supports true parallel execution on single-core configurations.",
+        "is_correct": false,
+        "distractor_rationale": "On a single core, only one task runs at a time; concurrency is achieved by time-slicing, not true parallelism."
+      }
+    ],
+    "explanation": "FreeRTOS selects the highest-priority ready task to run. sensorTask is created with priority 2 while publishTask has priority 1, so sensorTask runs first.",
+    "source_excerpt": "FreeRTOS always runs the highest-priority task that is in the Ready state. If two tasks share the same priority, they are time-sliced.",
+    "source_heading": "RTOS Fundamentals > FreeRTOS > Scheduling",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "HARD-1 | analyze | single_correct | debugging | deep sleep current",
+    "question": "An ESP32-S3 product is designed to run on a 1000 mAh battery for six months, waking every 10 minutes to take a reading and publish via MQTT. After deployment, batteries drain in three weeks. Current measurement during sleep shows 8 mA instead of the expected 15 \u00b5A. Which single configuration error most likely explains this?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The MQTT QoS level is set to 2, causing excessive retransmissions that prevent the radio from sleeping.",
+        "is_correct": false,
+        "distractor_rationale": "QoS 2 retransmissions occur during active mode, not during sleep; they would not keep the device awake at 8 mA continuously."
+      },
+      {
+        "label": "B",
+        "text": "The Wi-Fi driver is not explicitly stopped before calling esp_deep_sleep_start(), keeping the radio active.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The wakeup timer interval is set in milliseconds rather than microseconds, causing wakeups every 10 \u00b5s.",
+        "is_correct": false,
+        "distractor_rationale": "A 10 \u00b5s wakeup interval would cause measurably different behaviour \u2014 extremely rapid wakeup cycling \u2014 not a steady 8 mA sleep current."
+      },
+      {
+        "label": "D",
+        "text": "The ADC is sampling continuously in a background task that was not deleted before entering sleep.",
+        "is_correct": false,
+        "distractor_rationale": "A running task would prevent deep sleep entry entirely; the device would not show a consistent sleep current."
+      }
+    ],
+    "explanation": "8 mA is consistent with Wi-Fi modem-sleep or active-mode radio, not deep sleep. The most common cause of elevated deep sleep current is failing to call esp_wifi_stop() before esp_deep_sleep_start().",
+    "source_excerpt": "Failing to stop the Wi-Fi driver before entering deep sleep is the leading cause of unexpectedly high sleep current \u2014 the radio remains partially active even after the CPU sleeps.",
+    "source_heading": "Power Management > Deep Sleep > Common Pitfalls",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "HARD-2 | analyze | single_correct | comparison | QoS 1 vs QoS 2",
+    "question": "A medical wearable sends patient heart-rate alerts to a cloud platform. Each alert must arrive exactly once \u2014 duplicates could trigger false alarms in the monitoring system. Network conditions are variable. Which MQTT QoS level and session type should the system use?",
+    "options": [
+      {
+        "label": "A",
+        "text": "QoS 0 with a clean session, to minimise network overhead on a constrained device.",
+        "is_correct": false,
+        "distractor_rationale": "QoS 0 has no delivery guarantee; alerts can be lost silently."
+      },
+      {
+        "label": "B",
+        "text": "QoS 1 with a persistent session, to guarantee delivery with low overhead.",
+        "is_correct": false,
+        "distractor_rationale": "QoS 1 guarantees at-least-once delivery but allows duplicates \u2014 unacceptable for this scenario."
+      },
+      {
+        "label": "C",
+        "text": "QoS 2 with a persistent session, to guarantee exactly-once delivery.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "QoS 2 with a clean session, to guarantee exactly-once delivery while clearing stale state on reconnect.",
+        "is_correct": false,
+        "distractor_rationale": "A clean session discards the broker's queued messages on reconnect, which could cause alerts sent during disconnection to be lost."
+      }
+    ],
+    "explanation": "QoS 2 uses a four-part handshake to guarantee exactly-once delivery. A persistent session ensures queued alerts are delivered after reconnection rather than discarded.",
+    "source_excerpt": "QoS 2 guarantees exactly-once delivery using a four-part handshake. A persistent session retains queued messages across disconnections.",
+    "source_heading": "Communication Protocols > MQTT > Quality of Service",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "comparison"
+  },
+  {
+    "_comment": "HARD-3 | analyze | single_correct | debugging | I2C ACK failure",
+    "question": "A developer connects a temperature sensor (I2C address 0x48) and an OLED display (I2C address 0x3C) to an ESP32-S3. After initialisation, the sensor reads correctly but the display never responds. An oscilloscope shows the SDA line stays HIGH during display address frames. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The I2C clock speed is too high for the display; the sensor is faster and responds first.",
+        "is_correct": false,
+        "distractor_rationale": "A clock speed mismatch would cause intermittent failures on both devices, not silence on one only."
+      },
+      {
+        "label": "B",
+        "text": "The display's I2C address has been reconfigured to a different value by an address-select pin, and the firmware is targeting the wrong address.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The SDA and SCL lines are swapped for the display but not the sensor.",
+        "is_correct": false,
+        "distractor_rationale": "Swapped SDA/SCL would prevent any I2C communication entirely; the sensor would also fail."
+      },
+      {
+        "label": "D",
+        "text": "The display requires 5 V I2C logic levels and is not tolerating the 3.3 V signal from the ESP32-S3.",
+        "is_correct": false,
+        "distractor_rationale": "A voltage mismatch could cause unreliable response but would not cause a perfectly flat SDA line; some partial ACKs would typically appear."
+      }
+    ],
+    "explanation": "Many I2C peripherals have address-select pins (often labelled ADDR or A0) that allow the hardware address to be changed. If the pin is wired differently from the assumed state, the firmware targets the wrong address and the SDA line remains HIGH because no device acknowledges.",
+    "source_excerpt": "I2C device addresses can be modified via address-select pins. Always verify the physical pin state matches the address used in firmware.",
+    "source_heading": "Communication Protocols > I2C > Device Addressing",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "HARD-4 | analyze | single_correct | comparison | edge vs cloud processing",
+    "question": "A factory installs vibration sensors on 50 CNC machines. Each sensor produces 10 kB of raw data per second. A cloud analytics platform detects anomalies. Sending all raw data over cellular costs $800/month and introduces 200 ms latency. Which architecture change best reduces cost and latency simultaneously?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Increase MQTT QoS from 0 to 2 to ensure all vibration data reaches the cloud reliably.",
+        "is_correct": false,
+        "distractor_rationale": "Higher QoS increases overhead and cost \u2014 the opposite of the goal."
+      },
+      {
+        "label": "B",
+        "text": "Deploy an edge processor on each machine to extract anomaly features locally and transmit only feature vectors to the cloud.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Compress raw sensor data with gzip before transmission to reduce bandwidth usage.",
+        "is_correct": false,
+        "distractor_rationale": "Compression reduces bandwidth somewhat but still sends all data; it does not address latency and the savings are modest on sensor data."
+      },
+      {
+        "label": "D",
+        "text": "Batch sensor readings into hourly uploads to reduce the number of MQTT connections.",
+        "is_correct": false,
+        "distractor_rationale": "Batching dramatically increases latency and does not help with anomaly detection that requires near-real-time analysis."
+      }
+    ],
+    "explanation": "Edge processing extracts meaningful features (e.g., FFT peaks, RMS) locally and sends only those summaries to the cloud. This reduces data volume by orders of magnitude and eliminates network round-trip latency for local decision-making.",
+    "source_excerpt": "Edge computing reduces bandwidth and latency by processing data locally and transmitting only relevant features or decisions to the cloud.",
+    "source_heading": "IoT Architecture > Edge Computing",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "comparison"
+  },
+  {
+    "_comment": "HARD-5 | analyze | single_correct | debugging | FreeRTOS stack overflow",
+    "question": "An ESP32-S3 application runs two FreeRTOS tasks. After 48 hours of operation, the device crashes with a stack overflow exception on taskB. The developer allocated 2048 bytes of stack to taskB. Which of the following is the most structurally correct fix?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Increase taskB's stack to 8192 bytes and redeploy.",
+        "is_correct": false,
+        "distractor_rationale": "Increasing stack without profiling masks the root cause and wastes RAM \u2014 not a structurally correct fix."
+      },
+      {
+        "label": "B",
+        "text": "Profile taskB's maximum stack usage with uxTaskGetStackHighWaterMark() and allocate stack based on measured peak usage plus a safety margin.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Reduce taskB's priority so it runs less frequently and therefore uses less stack.",
+        "is_correct": false,
+        "distractor_rationale": "Stack depth is determined by call depth and local variable usage, not by how often a task runs."
+      },
+      {
+        "label": "D",
+        "text": "Switch taskB to a timer callback to avoid needing a dedicated stack.",
+        "is_correct": false,
+        "distractor_rationale": "Timer callbacks have their own (typically smaller) stack and are inappropriate for tasks with significant call depth."
+      }
+    ],
+    "explanation": "uxTaskGetStackHighWaterMark() returns the minimum ever recorded free stack space. Measuring this at runtime gives an evidence-based minimum allocation, which should then have a safety margin added.",
+    "source_excerpt": "Use uxTaskGetStackHighWaterMark() to measure the minimum free stack during operation and size the stack allocation accordingly.",
+    "source_heading": "RTOS Fundamentals > FreeRTOS > Stack Management",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "HARD-6 | analyze | single_correct | comparison | BLE vs Wi-Fi for wearable",
+    "question": "A smartwatch must stream heart-rate data to a paired smartphone at 50 samples per second while running on a 180 mAh battery for 18 hours. Which wireless technology is more appropriate and why?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Wi-Fi, because it has higher throughput and lower latency than BLE.",
+        "is_correct": false,
+        "distractor_rationale": "Wi-Fi throughput is overkill for 50 samples/sec and draws 10\u201320\u00d7 more current than BLE in continuous use."
+      },
+      {
+        "label": "B",
+        "text": "BLE, because its connection-oriented mode provides continuous low-power streaming to a paired central device.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Wi-Fi with power-save mode, because it can achieve the same power level as BLE while offering higher bandwidth.",
+        "is_correct": false,
+        "distractor_rationale": "Wi-Fi power-save mode still consumes significantly more current than BLE; BLE remains the better choice at this data rate."
+      },
+      {
+        "label": "D",
+        "text": "BLE advertising, because it broadcasts data without requiring a connection and therefore uses the least power.",
+        "is_correct": false,
+        "distractor_rationale": "BLE advertising is for discovery and short data bursts; continuous 50 samples/sec streaming requires a connection, not advertising."
+      }
+    ],
+    "explanation": "BLE connection mode provides continuous bidirectional data transfer with current consumption in the single-milliamp range, making it suitable for long-duration wearable applications at low data rates.",
+    "source_excerpt": "BLE connection mode is designed for continuous low-power data exchange between two paired devices and is preferred for wearable applications requiring all-day battery life.",
+    "source_heading": "Communication Protocols > BLE > Use Cases",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "comparison"
+  },
+  {
+    "_comment": "EXPERT-1 | evaluate | single_correct | comparison | protocol architecture for fleet",
+    "question": "A startup is designing a fleet of 10,000 battery-powered agricultural sensors. Each sensor reports soil temperature once per hour over a cellular network. Requirements: battery life \u2265 2 years, monthly data cost \u2264 $0.01 per device, and firmware must be updatable remotely. Which architecture best satisfies all three constraints?",
+    "options": [
+      {
+        "label": "A",
+        "text": "HTTPS REST API with JWT authentication, hourly POST requests, and OTA via HTTPS download triggered by a server push.",
+        "is_correct": false,
+        "distractor_rationale": "HTTPS has high per-connection overhead (TLS handshake); at hourly intervals the overhead-to-payload ratio is unfavourable for both cost and battery."
+      },
+      {
+        "label": "B",
+        "text": "MQTT over TLS with QoS 0, LTE-M radio in PSM mode, and OTA images delivered via MQTT topics.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "UDP with a custom application protocol, no encryption, and OTA via TFTP.",
+        "is_correct": false,
+        "distractor_rationale": "UDP with no encryption fails regulatory requirements for agricultural data in most regions; TFTP has no authentication, making OTA insecure."
+      },
+      {
+        "label": "D",
+        "text": "MQTT over TLS with QoS 2, always-on LTE connection, and OTA via HTTPS.",
+        "is_correct": false,
+        "distractor_rationale": "QoS 2's four-part handshake and an always-on LTE radio would destroy battery life and cost targets simultaneously."
+      }
+    ],
+    "explanation": "LTE-M PSM (Power Saving Mode) allows the radio to sleep for hours between transmissions. MQTT QoS 0 minimises overhead for non-critical telemetry. Together they keep both current draw and per-message data cost near the minimum while retaining OTA capability through MQTT.",
+    "source_excerpt": "LTE-M with PSM and MQTT QoS 0 is the recommended combination for battery-powered cellular IoT devices requiring multi-year operation at low reporting frequency.",
+    "source_heading": "IoT Architecture > Cellular IoT > Design Patterns",
+    "bloom_level": "evaluate",
+    "difficulty": "expert",
+    "question_type": "single_correct",
+    "stem_pattern": "comparison"
+  },
+  {
+    "_comment": "EXPERT-2 | evaluate | single_correct | scenario | security threat modelling",
+    "question": "An IoT gateway aggregates data from 200 industrial sensors and forwards it to a cloud SCADA platform. The gateway runs Linux, exposes MQTT port 1883 externally, has SSH enabled on port 22 with password authentication, and uses self-signed TLS certificates. A security auditor flags three vulnerabilities. Which remediation addresses the highest-risk exposure first?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Replace self-signed TLS certificates with CA-signed certificates to improve trust chain validation.",
+        "is_correct": false,
+        "distractor_rationale": "Self-signed certificates reduce auditability but do not expose the system to unauthenticated remote access as directly as open MQTT or SSH."
+      },
+      {
+        "label": "B",
+        "text": "Restrict MQTT port 1883 to internal network interfaces and require TLS on port 8883 for external connections.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Disable SSH and use a serial console for all local administration.",
+        "is_correct": false,
+        "distractor_rationale": "SSH with password auth is a significant risk but can be hardened by disabling password auth in favour of keys \u2014 disabling SSH entirely sacrifices remote management without adequate justification."
+      },
+      {
+        "label": "D",
+        "text": "Enable MQTT authentication with username and password to prevent unauthorised publishing.",
+        "is_correct": false,
+        "distractor_rationale": "Username/password over plaintext MQTT 1883 transmits credentials in the clear \u2014 adding auth without encryption provides marginal improvement."
+      }
+    ],
+    "explanation": "Exposing plaintext MQTT on port 1883 externally allows any network-reachable attacker to inject or intercept industrial control data without any authentication or encryption. This is the highest-risk exposure. Restricting 1883 to the internal interface and requiring TLS on 8883 closes the most critical gap.",
+    "source_excerpt": "MQTT port 1883 transmits data in plaintext with no authentication by default. Exposing it to external networks on industrial gateways is classified as a critical misconfiguration.",
+    "source_heading": "IoT Security > Gateway Configuration > Common Vulnerabilities",
+    "bloom_level": "evaluate",
+    "difficulty": "expert",
+    "question_type": "single_correct",
+    "stem_pattern": "scenario"
+  },
+  {
+    "_comment": "EXPERT-3 | evaluate | single_correct | comparison | OTA strategy at scale",
+    "question": "A company operates 80,000 ESP32-S3 devices across five continents. A critical security patch must reach all devices within 72 hours. Devices are on diverse networks including LTE-M, NB-IoT, and Wi-Fi. What OTA strategy minimises risk of mass failure while meeting the 72-hour deadline?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Push the update simultaneously to all 80,000 devices to complete the rollout as fast as possible.",
+        "is_correct": false,
+        "distractor_rationale": "A simultaneous rollout means a firmware bug affects all devices at once with no opportunity to detect and abort."
+      },
+      {
+        "label": "B",
+        "text": "Roll out the update in progressive waves \u2014 1% then 10% then 50% then 100% \u2014 with automated health checks and rollback triggers between waves.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Require each device to manually confirm the update to ensure operator awareness before installation.",
+        "is_correct": false,
+        "distractor_rationale": "Manual confirmation on 80,000 devices is operationally infeasible within a 72-hour window."
+      },
+      {
+        "label": "D",
+        "text": "Deliver the patch only to devices connected via Wi-Fi, since LTE-M and NB-IoT have insufficient bandwidth for firmware transfers.",
+        "is_correct": false,
+        "distractor_rationale": "NB-IoT and LTE-M are designed for small data payloads but can handle firmware transfer at lower speeds \u2014 excluding them would leave the majority of devices unpatched."
+      }
+    ],
+    "explanation": "Progressive rollout with automated health gates allows the team to detect boot-loop failures or connectivity regressions at small scale and roll back before the blast radius grows. This is the standard production OTA strategy for large fleets.",
+    "source_excerpt": "Large-scale OTA deployments should use progressive rollout with automated rollback triggers to limit the impact of a defective firmware release.",
+    "source_heading": "Firmware Management > OTA at Scale",
+    "bloom_level": "evaluate",
+    "difficulty": "expert",
+    "question_type": "single_correct",
+    "stem_pattern": "comparison"
+  },
+  {
+    "_comment": "ORDERING-1 | apply | ordering | procedure | boot sequence steps",
+    "question": "Arrange the following steps in the correct order for initialising an MQTT connection on an ESP32-S3 after power-on.",
+    "options": [
+      {
+        "label": "A",
+        "text": "Call esp_mqtt_client_start() to connect to the broker.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "Initialise the Wi-Fi driver and connect to the access point.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Configure the MQTT client with broker URI and credentials.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Wait for the IP_EVENT_STA_GOT_IP event before proceeding.",
+        "is_correct": false,
+        "distractor_rationale": null
+      }
+    ],
+    "correct_order": [
+      "B",
+      "D",
+      "C",
+      "A"
+    ],
+    "explanation": "Wi-Fi must connect first (B). The application waits for a valid IP address (D) before configuring the MQTT client (C) and then starting the connection (A). Starting MQTT without a valid IP causes an immediate connection error.",
+    "source_excerpt": "The correct initialisation sequence is: connect Wi-Fi, wait for IP assignment, configure MQTT client, then call esp_mqtt_client_start().",
+    "source_heading": "Communication Protocols > MQTT > Initialisation",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "ordering",
+    "stem_pattern": "procedure"
+  },
+  {
+    "_comment": "ORDERING-2 | apply | ordering | procedure | OTA update sequence",
+    "question": "Place the following OTA update steps in the correct order.",
+    "options": [
+      {
+        "label": "A",
+        "text": "Validate the downloaded binary with a hash or signature check.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "Set the new partition as the boot partition and restart the device.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Open the OTA partition for writing using esp_ota_begin().",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Download the firmware binary from the OTA server in chunks.",
+        "is_correct": false,
+        "distractor_rationale": null
+      }
+    ],
+    "correct_order": [
+      "C",
+      "D",
+      "A",
+      "B"
+    ],
+    "explanation": "The OTA partition is opened first (C), then chunks are written as they are downloaded (D). Once the full image is received it must be validated (A) before setting the boot flag and restarting (B). Restarting before validation risks booting a corrupt image.",
+    "source_excerpt": "OTA procedure: open the update partition, write the incoming binary data, verify integrity, then set the boot partition before restarting.",
+    "source_heading": "Firmware Management > OTA Updates > Procedure",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "ordering",
+    "stem_pattern": "procedure"
+  },
+  {
+    "_comment": "ORDERING-3 | apply | ordering | procedure | I2C read transaction",
+    "question": "Arrange the following steps in the correct order for reading a register value from an I2C sensor.",
+    "options": [
+      {
+        "label": "A",
+        "text": "Send a repeated START and the sensor address with the READ bit set.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "Send the sensor address with the WRITE bit set.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Read the data byte and send NACK followed by STOP.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Write the register address byte to specify which register to read.",
+        "is_correct": false,
+        "distractor_rationale": null
+      }
+    ],
+    "correct_order": [
+      "B",
+      "D",
+      "A",
+      "C"
+    ],
+    "explanation": "An I2C register read begins by writing the target register address (B then D), then uses a repeated START to switch direction (A) before clocking in the data (C). Sending a STOP before the repeated START would end the transaction prematurely.",
+    "source_excerpt": "A standard I2C register read: address + WRITE, register byte, repeated START, address + READ, data byte, NACK, STOP.",
+    "source_heading": "Communication Protocols > I2C > Read Transactions",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "ordering",
+    "stem_pattern": "procedure"
+  },
+  {
+    "_comment": "ORDERING-4 | analyze | ordering | procedure | deep sleep entry sequence",
+    "question": "A developer wants to enter deep sleep correctly on an ESP32-S3. Arrange the following steps in the correct order.",
+    "options": [
+      {
+        "label": "A",
+        "text": "Call esp_deep_sleep_start().",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "Flush and close any open NVS handles.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Call esp_sleep_enable_timer_wakeup() with the desired sleep duration.",
+        "is_correct": false,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Call esp_wifi_stop() and esp_wifi_deinit() to shut down the radio.",
+        "is_correct": false,
+        "distractor_rationale": null
+      }
+    ],
+    "correct_order": [
+      "B",
+      "D",
+      "C",
+      "A"
+    ],
+    "explanation": "NVS handles must be closed before sleep to prevent data corruption (B). The Wi-Fi driver must be stopped to avoid elevated sleep current (D). The wakeup source is configured next (C). Only then is deep sleep entered (A). Entering sleep with the radio active is the most common cause of excessive current draw.",
+    "source_excerpt": "Before entering deep sleep: commit and close NVS, stop Wi-Fi, configure wakeup sources, then call esp_deep_sleep_start().",
+    "source_heading": "Power Management > Deep Sleep > Correct Entry Sequence",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "ordering",
+    "stem_pattern": "procedure"
+  },
+  {
+    "_comment": "CODE-1 | apply | single_correct | code-reading | interrupt handler anti-pattern",
+    "question": "A developer writes the following interrupt service routine for a button press:\n\nvoid IRAM_ATTR buttonISR(void *arg) {\n    vTaskDelay(pdMS_TO_TICKS(50));  // debounce\n    gpio_set_level(LED_PIN, 1);\n    ESP_LOGI(TAG, \"Button pressed\");\n}\n\nThis code compiles and runs, but the system crashes intermittently. What is the root cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "gpio_set_level() cannot be called from an ISR because it is not IRAM-resident.",
+        "is_correct": false,
+        "distractor_rationale": "gpio_set_level() is IRAM-safe on ESP32-S3; this is not the issue."
+      },
+      {
+        "label": "B",
+        "text": "vTaskDelay() and ESP_LOGI() must not be called from an ISR; they block or use resources unavailable in interrupt context.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The IRAM_ATTR attribute prevents the function from accessing GPIO peripherals.",
+        "is_correct": false,
+        "distractor_rationale": "IRAM_ATTR places the function in IRAM for fast execution; it does not restrict peripheral access."
+      },
+      {
+        "label": "D",
+        "text": "The interrupt fires too rapidly for the LED to respond, causing a race condition.",
+        "is_correct": false,
+        "distractor_rationale": "The crash is not timing-related; it is caused by illegal API calls within the ISR."
+      }
+    ],
+    "explanation": "ISRs execute with the scheduler suspended. vTaskDelay() attempts to yield \u2014 illegal in an ISR \u2014 and ESP_LOGI() uses a non-IRAM-safe logging backend. Both will corrupt the FreeRTOS state. The correct pattern is to use a semaphore or task notification from the ISR and handle debounce and logging in a normal task.",
+    "source_excerpt": "ISRs must never call FreeRTOS API functions that are not ISR-safe. vTaskDelay(), xQueueSend(), and logging functions must be replaced with their FromISR variants or avoided entirely.",
+    "source_heading": "Microcontroller Programming > Interrupts > ISR Constraints",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "CODE-2 | analyze | single_correct | code-reading | NVS write without commit",
+    "question": "Review the following NVS write sequence:\n\nnvs_handle_t h;\nnvs_open(\"storage\", NVS_READWRITE, &h);\nnvs_set_u32(h, \"boot_count\", count);\nnvs_close(h);\n\nAfter a power cycle, the value of boot_count is always 0. What is missing?",
+    "options": [
+      {
+        "label": "A",
+        "text": "nvs_flash_init() was not called before nvs_open().",
+        "is_correct": false,
+        "distractor_rationale": "A missing nvs_flash_init() would cause nvs_open() to return an error, not a silent write failure."
+      },
+      {
+        "label": "B",
+        "text": "nvs_commit(h) was not called before nvs_close(), so the value was never persisted to flash.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The namespace 'storage' does not exist; it must be created with nvs_create_namespace() first.",
+        "is_correct": false,
+        "distractor_rationale": "NVS namespaces are created implicitly on first use; no separate creation call is required."
+      },
+      {
+        "label": "D",
+        "text": "NVS cannot store uint32 values; nvs_set_blob() should be used instead.",
+        "is_correct": false,
+        "distractor_rationale": "nvs_set_u32() is a valid NVS API function for 32-bit unsigned integers."
+      }
+    ],
+    "explanation": "NVS writes are buffered in RAM until nvs_commit() is called. Without the commit, the data exists only in the cache and is lost on power loss or reset.",
+    "source_excerpt": "After writing values to NVS, call nvs_commit() to flush the data to flash. Without this call, changes are lost on power cycle.",
+    "source_heading": "Storage > NVS > Write and Commit",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "CODE-3 | apply | single_correct | code-reading | mutex usage",
+    "question": "Two FreeRTOS tasks share a global buffer. The developer protects it with the following code:\n\nSemaphoreHandle_t mutex = xSemaphoreCreateMutex();\n\n// In taskA:\nxSemaphoreTake(mutex, portMAX_DELAY);\nmemcpy(buffer, data, len);\nxSemaphoreGive(mutex);\n\n// In taskB:\nmemcpy(output, buffer, len);  // no mutex\n\nWhat problem does this code have?",
+    "options": [
+      {
+        "label": "A",
+        "text": "xSemaphoreCreateMutex() cannot be used to protect memory buffers; xSemaphoreCreateBinary() must be used instead.",
+        "is_correct": false,
+        "distractor_rationale": "A mutex is exactly the correct primitive for mutual exclusion over shared resources."
+      },
+      {
+        "label": "B",
+        "text": "taskB reads the buffer without acquiring the mutex, creating an unprotected concurrent access.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "portMAX_DELAY causes taskA to block indefinitely and prevents taskB from ever running.",
+        "is_correct": false,
+        "distractor_rationale": "portMAX_DELAY means wait forever for the mutex to become available \u2014 it does not block other tasks once the mutex is held and then released."
+      },
+      {
+        "label": "D",
+        "text": "memcpy() is not thread-safe and cannot be used inside a critical section.",
+        "is_correct": false,
+        "distractor_rationale": "memcpy() has no internal synchronisation requirements; it is safe to use inside a mutex-protected section."
+      }
+    ],
+    "explanation": "Mutual exclusion only works if all accesses to the shared resource go through the same lock. taskB bypasses the mutex entirely, so taskA's protection is ineffective \u2014 a race condition remains.",
+    "source_excerpt": "All tasks that access a shared resource must acquire the same mutex before reading or writing. Protecting writes but not reads leaves the resource vulnerable to race conditions.",
+    "source_heading": "RTOS Fundamentals > FreeRTOS > Mutexes and Shared Resources",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "CODE-4 | analyze | single_correct | code-reading | heap allocation in task",
+    "question": "A FreeRTOS task allocates memory on every iteration:\n\nvoid sensorTask(void *arg) {\n    while (1) {\n        float *buf = malloc(128 * sizeof(float));\n        readSensor(buf);\n        publishData(buf);\n        vTaskDelay(pdMS_TO_TICKS(1000));\n    }\n}\n\nAfter 6 hours the device crashes with 'out of memory'. What is the cause and the correct fix?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The buffer is too large for the heap; reduce it to 32 floats.",
+        "is_correct": false,
+        "distractor_rationale": "512 bytes is well within ESP32-S3's heap; size is not the issue."
+      },
+      {
+        "label": "B",
+        "text": "malloc() is not thread-safe in FreeRTOS and corrupts the heap; use pvPortMalloc() instead.",
+        "is_correct": false,
+        "distractor_rationale": "ESP-IDF's malloc() is backed by pvPortMalloc() and is thread-safe; this is not the cause."
+      },
+      {
+        "label": "C",
+        "text": "The buffer is never freed after use; heap exhaustion occurs gradually as unreleased memory accumulates.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "vTaskDelay() resets the heap allocator state and invalidates the pointer on each iteration.",
+        "is_correct": false,
+        "distractor_rationale": "vTaskDelay() yields the CPU; it has no effect on heap state or pointer validity."
+      }
+    ],
+    "explanation": "Every malloc() must be paired with a free(). Without free(buf) after publishData(), 512 bytes of heap are leaked on every iteration. After 6 hours (21,600 iterations) nearly 10 MB of heap has been leaked \u2014 far exceeding the available RAM.",
+    "source_excerpt": "Every heap allocation with malloc() or pvPortMalloc() must be explicitly freed with free() when no longer needed. Failing to do so causes heap exhaustion over time.",
+    "source_heading": "Memory Management > Heap Allocation",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "CODE-5 | apply | single_correct | code-reading | ADC attenuation",
+    "question": "A developer reads a 0\u20133.3 V sensor on an ESP32-S3 ADC channel:\n\nadc1_config_width(ADC_WIDTH_BIT_12);\nadc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_0);\nint raw = adc1_get_raw(ADC1_CHANNEL_0);\n\nReadings saturate at approximately 1100 mV even when the sensor outputs 3.3 V. What is wrong?",
+    "options": [
+      {
+        "label": "A",
+        "text": "ADC_WIDTH_BIT_12 exceeds the ESP32-S3's maximum resolution of 10 bits.",
+        "is_correct": false,
+        "distractor_rationale": "The ESP32-S3 ADC supports up to 12-bit resolution; this is not the issue."
+      },
+      {
+        "label": "B",
+        "text": "ADC_ATTEN_DB_0 limits the measurable input range to approximately 0\u20131.1 V; ADC_ATTEN_DB_12 is needed to cover 0\u20133.3 V.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "adc1_get_raw() returns a value in millivolts, not a raw ADC count, so the reading appears clamped.",
+        "is_correct": false,
+        "distractor_rationale": "adc1_get_raw() returns a raw digital count (0\u20134095), not millivolts."
+      },
+      {
+        "label": "D",
+        "text": "GPIO0 cannot be used as ADC1_CHANNEL_0 on ESP32-S3; a different channel must be selected.",
+        "is_correct": false,
+        "distractor_rationale": "The question addresses attenuation configuration, not channel mapping; this is a distractor."
+      }
+    ],
+    "explanation": "ADC attenuation sets the full-scale input voltage. ADC_ATTEN_DB_0 has a full scale of ~1.1 V. To measure up to 3.3 V, ADC_ATTEN_DB_12 (full scale ~3.9 V) must be used.",
+    "source_excerpt": "ADC_ATTEN_DB_0 allows input voltages up to approximately 1.1 V. Use ADC_ATTEN_DB_12 to measure signals up to the GPIO voltage level of 3.3 V.",
+    "source_heading": "Microcontroller Peripherals > ADC > Attenuation",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  },
+  {
+    "_comment": "CODE-6 | analyze | single_correct | code-reading | semaphore from ISR",
+    "question": "A developer uses the following pattern to signal a task from a GPIO interrupt:\n\nSemaphoreHandle_t sem;\n\nvoid IRAM_ATTR gpioISR(void *arg) {\n    xSemaphoreGive(sem);\n}\n\nvoid handlerTask(void *arg) {\n    while (1) {\n        xSemaphoreTake(sem, portMAX_DELAY);\n        processEvent();\n    }\n}\n\nThe application crashes occasionally. What should the developer change?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Replace xSemaphoreGive() with xSemaphoreGiveFromISR() and add a portYIELD_FROM_ISR() call.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "Replace xSemaphoreTake() with xSemaphoreTakeFromISR() in handlerTask.",
+        "is_correct": false,
+        "distractor_rationale": "handlerTask runs in normal task context; the FromISR variant is for use inside ISRs only."
+      },
+      {
+        "label": "C",
+        "text": "Create the semaphore as a mutex rather than a binary semaphore to support ISR signalling.",
+        "is_correct": false,
+        "distractor_rationale": "Mutexes must not be given from ISRs; binary semaphores are the correct primitive for ISR-to-task signalling."
+      },
+      {
+        "label": "D",
+        "text": "Move the processEvent() call directly into the ISR to avoid the need for a semaphore.",
+        "is_correct": false,
+        "distractor_rationale": "ISRs should be as short as possible; blocking work like processEvent() must be deferred to a task."
+      }
+    ],
+    "explanation": "xSemaphoreGive() must not be called from an ISR \u2014 it may access non-IRAM memory or trigger a context switch incorrectly. xSemaphoreGiveFromISR() is the ISR-safe variant. portYIELD_FROM_ISR() ensures the unblocked task is scheduled promptly.",
+    "source_excerpt": "In ISR context, use xSemaphoreGiveFromISR() instead of xSemaphoreGive(), and pass the pxHigherPriorityTaskWoken parameter to portYIELD_FROM_ISR().",
+    "source_heading": "RTOS Fundamentals > FreeRTOS > ISR-Safe API",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct",
+    "stem_pattern": "debugging"
+  }
+]

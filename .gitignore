@@ -1,0 +1,41 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+*.egg
+
+# Virtual envs
+venv/
+.venv/
+env/
+mcq_env/
+
+# Logs and generated output
+logs/*.db
+output/*.json
+output/*.csv
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated data files in project root
+questions.json
+
+# Claude Code local configuration
+.claude/

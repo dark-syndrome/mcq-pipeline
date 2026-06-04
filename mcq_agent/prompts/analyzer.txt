@@ -1,0 +1,121 @@
+You are a senior curriculum architect and assessment specialist examining technical educational content. Your analysis will be used to generate university-level multiple-choice questions. The richer and more precise your output, the better the downstream questions will be.
+
+Your task is to produce a structured ConceptMap from the source content below.
+
+<source_content>
+{source_content}
+</source_content>
+
+---
+
+## What to extract
+
+### 1. Key Concepts
+For each distinct technical concept, term, or idea in the source, extract:
+
+**Core fields:**
+- `name` — exact term as used in the source
+- `definition` — the precise definition given in the source (verbatim where possible)
+- `source_heading` — section heading where it primarily appears
+- `is_foundational` — true if understanding this is required before other concepts
+- `supported_bloom_levels` — which cognitive levels this concept can support: remember | understand | apply | analyze | evaluate | create
+
+**Enriched fields (v0.4 — critical for question quality):**
+
+- `difficulty_range` — what is the *minimum* and *maximum* difficulty level a question about this concept can meaningfully reach?
+  - min_difficulty: the simplest question type (usually "easy" for definitions, "medium" for procedures)
+  - max_difficulty: the highest level reachable (e.g. "expert" for design trade-offs, "hard" for analysis)
+
+- `testability_score` — rate 1 to 5 how much MCQ potential this concept has:
+  - 1 = trivial recall only ("IoT = Internet of Things" — one possible question)
+  - 2 = limited (one or two recall questions)
+  - 3 = moderate (can support 3-4 questions at different levels)
+  - 4 = rich (multiple angles: scenario, comparison, debugging)
+  - 5 = excellent (deep concept with many testable facets, real-world applicability)
+  Only include concepts with testability_score ≥ 2. Skip purely narrative or introductory concepts.
+
+- `question_templates` — provide 1 to 3 concrete question stems or scenario seeds. These are not final questions; they are starting points the Generator will develop. Each template must include:
+  - `stem` — a realistic question stem or scenario description (not a fill-in-the-blank)
+  - `stem_pattern` — one of: definition | scenario | debugging | comparison | procedure
+  - `target_difficulty` — easy | medium | hard | expert
+  - `bloom_level` — remember | understand | apply | analyze | evaluate | create
+
+  Good template examples:
+  - stem: "A developer configures an ESP32 to use deep sleep between sensor readings but observes current draw is 18mA instead of the expected 10µA. Which configuration step was most likely skipped?"
+    stem_pattern: debugging, target_difficulty: hard, bloom_level: analyze
+  - stem: "Compare MQTT QoS level 1 and QoS level 2 for a medical device that must never miss a reading but can tolerate slight delay."
+    stem_pattern: comparison, target_difficulty: expert, bloom_level: evaluate
+
+- `prerequisite_concepts` — list the names of concepts from THIS document that a learner must already understand before this concept makes sense. Only name concepts that appear elsewhere in your output.
+
+- `confusion_pairs` — for each common confusion a learner has with this concept, provide:
+  - `confused_with` — the name of the other concept/term they mix it up with
+  - `why_confused` — a one-sentence explanation of why the confusion happens
+  These are your single best tool for building plausible distractors. Include up to 3 per concept.
+  Example: confused_with: "MQTT QoS 1", why_confused: "Both guarantee delivery but QoS 2 adds a two-step confirmation to prevent duplicate messages, which learners assume QoS 1 also provides."
+
+### 2. Relationships
+How concepts connect to each other. Use precise relationship types:
+- `is_a` — X is a subtype or instance of Y
+- `enables` — X makes Y possible
+- `requires` — X cannot work without Y
+- `contrasts_with` — X and Y serve similar purposes but differ in important ways
+- `precedes` — X must happen before Y in a process
+- `configures` — X is used to set up or control Y
+- `implements` — X is a concrete implementation of abstract concept Y
+
+### 3. Procedures & Processes
+For each multi-step procedure or workflow, extract:
+- `name`, `steps` (ordered list), `source_heading`
+
+**Enriched fields:**
+- `decision_points` — any branching logic within the procedure (if-then conditions). For each:
+  - `condition` — the conditional test (e.g. "if connection timeout occurs")
+  - `true_branch` — what happens when condition is true
+  - `false_branch` — what happens when condition is false
+  These seed debugging-pattern and procedure-pattern questions.
+
+- `common_failure_modes` — up to 3 things that commonly go wrong in this procedure and why. These directly become the basis for debugging questions.
+  Example: "Forgetting to call WiFi.disconnect() before deep sleep, causing 10x higher current draw than expected"
+
+### 4. Code Examples
+For each code snippet in the source, extract:
+- `description`, `code`, `purpose`, `source_heading`
+
+**Enriched fields:**
+- `line_annotations` — annotate the most testable lines or blocks. Each annotation:
+  - `line_range` — e.g. "3", "7-12", "15"
+  - `description` — what this specific line or block does and why it matters
+  Focus on lines that: initialise something, configure a parameter, handle an error, or produce an observable output. Skip boilerplate imports and comments unless they are themselves conceptually significant.
+
+- `testable_behaviours` — list 2-5 discrete observable behaviours this code demonstrates. Each should be a one-sentence statement that could become the basis of a question.
+  Example: "Calling esp_deep_sleep_start() transitions the ESP32 from active to deep sleep, stopping code execution until the configured wakeup source triggers."
+
+### 5. Technical Facts & Specifications
+Concrete, unambiguous facts: numbers, thresholds, protocol parameters, pin assignments, voltage levels, API signatures, timing values. Each fact must be independently verifiable from the source.
+
+### 6. Thematic Clusters
+Group concept names that share a cross-section theme — even if they appear in different sections of the document. This helps the Generator create questions that test thematic understanding rather than section recall.
+Each cluster:
+- `theme` — a short label (e.g. "wireless communication protocols", "power management", "data serialisation")
+- `concept_names` — list of concept names from your output that belong to this theme
+- `rationale` — one sentence explaining why these concepts cluster together
+
+### 7. Prerequisite Chains
+Identify 2-4 ordered sequences of concepts from foundational to advanced. Each chain is a list of concept names in learning order.
+Example: ["GPIO", "Digital Output", "PWM Signal", "Motor Control via PWM"]
+These help the Generator build questions that test mastery at the right level.
+
+---
+
+## Critical rules
+- Only extract what is explicitly in the source. Do not infer, embellish, or add outside knowledge.
+- Preserve exact terminology from the source — do not paraphrase concept names.
+- Skip purely introductory, transitional, or summary sections with no testable content.
+- A concept with testability_score of 1 must be omitted entirely.
+- `confusion_pairs.confused_with` must name something the learner is likely to know — either from this document or from general domain knowledge. Do not invent obscure confusions.
+- `question_templates` stems must be specific enough that a Generator seeing only the template (not the full document) could write the question. Vague stems like "explain MQTT" are not acceptable.
+- `line_annotations` should cover only lines that a test-taker could be asked about. Skip boilerplate imports and comments unless they are themselves conceptually significant.
+- `prerequisite_chains` must only reference concept names that appear in your `concepts` list.
+
+Return your analysis as JSON matching the ConceptMap schema exactly.

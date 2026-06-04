@@ -1,0 +1,36 @@
+# LLM SDKs — all installed; config.yaml picks which one to use at runtime
+groq>=0.11.0
+anthropic>=0.39.0
+openai>=1.30.0          # also used by OpenRouterClient (OpenAI-compatible)
+
+# Structured-output wrapper that works with both providers
+instructor>=1.4.0
+
+# Data models / settings
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+
+# CLI + console output
+typer>=0.12.0
+rich>=13.7.0
+click>=8.1.0
+
+# Config + env
+PyYAML>=6.0.1
+python-dotenv>=1.0.0
+
+# Markdown parsing
+markdown-it-py>=3.0.0
+
+# Validators / fuzzy matching
+rapidfuzz>=3.6.0
+
+# Cloud storage (Supabase — optional, enable via config.yaml)
+# Install with: pip install "mcq-agent[cloud]"  OR  pip install supabase>=2.3.0
+supabase>=2.3.0
+
+# Retry logic
+tenacity>=8.2.0
+
+# Structured logging
+structlog>=24.1.0
