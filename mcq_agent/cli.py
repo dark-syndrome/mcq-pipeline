@@ -22,7 +22,9 @@ from . import pipeline as pipeline_mod
 from . import storage
 from .config import Settings, load_config, load_dotenv_and_get_api_key
 from .llm_client import LLMClient, make_client
+from .parser import parse_markdown
 from .schemas import Difficulty, MCQConfig, QuestionType
+from .source_linter import run_static_linter
 
 app = typer.Typer(
     name="mcq-agent",
@@ -327,6 +329,48 @@ def generate(
             "are logged above as [pipeline_partial_cost_report]. "
             "Run with --verbose to see the full breakdown.[/dim]"
         )
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def lint(
+    input: Annotated[Path, typer.Option("--input", "-i", help="Path to source .md file")],
+    config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
+    json_output: Annotated[bool, typer.Option(
+        "--json", help="Emit the Layer-1 SourceQualityReport as JSON to stdout "
+                       "(for the GUI Run-tab source-quality card)."
+    )] = False,
+) -> None:
+    """
+    Run the Layer-1 static source linter only — no API calls, no cost.
+
+    Checks word count, section count, thin sections, code blocks, and term
+    density against the linter_* thresholds in config.yaml.
+    """
+    try:
+        settings = load_config(config)
+        document = parse_markdown(input)
+        report = run_static_linter(document, settings, str(input), run_id="lint")
+
+        if json_output:
+            sys.stdout.write(json.dumps(report.to_dict()))
+            sys.stdout.flush()
+            return
+
+        color = {"PASS": "green", "WARN": "yellow", "FAIL": "red"}
+        console.print(
+            f"\n[bold]Source Quality — {input.name}[/bold]  →  "
+            f"[{color.get(report.overall_status, 'white')}]{report.overall_status}[/]"
+        )
+        for c in report.checks:
+            console.print(f"  [{color.get(c.status, 'white')}]{c.status}[/] {c.name}: {c.message}")
+        console.print(f"\n[dim]{report.recommendation}[/dim]")
+    except Exception as exc:
+        if json_output:
+            sys.stdout.write(json.dumps({"error": str(exc)}))
+            sys.stdout.flush()
+            raise typer.Exit(code=1)
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
 
