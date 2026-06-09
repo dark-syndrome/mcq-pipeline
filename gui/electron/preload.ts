@@ -11,12 +11,19 @@ const api = {
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),
+    dump: (defaults?: boolean) => ipcRenderer.invoke('config:dump', defaults),
+    write: (changes: Record<string, unknown>) =>
+      ipcRenderer.invoke('config:write', changes),
   },
   lint: {
     run: (input: string) => ipcRenderer.invoke('lint:run', input),
   },
   dialog: {
     openMarkdown: () => ipcRenderer.invoke('dialog:openMarkdown'),
+  },
+  file: {
+    saveCopy: (srcPath: string) => ipcRenderer.invoke('file:saveCopy', srcPath),
+    showInFolder: (p: string) => ipcRenderer.invoke('file:showInFolder', p),
   },
   // Electron 33 removed File.path; resolve a dropped/selected file's absolute path.
   getPathForFile: (file: File) => webUtils.getPathForFile(file),

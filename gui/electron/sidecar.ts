@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
+import path from 'node:path'
 import type { BrowserWindow } from 'electron'
 import { REPO_ROOT, resolvePython } from './paths'
 
@@ -37,7 +38,9 @@ export function startRun(win: BrowserWindow, params: RunParams): void {
   if (params.difficulty) args.push('--difficulty', params.difficulty)
   if (params.type) args.push('--type', params.type)
   if (params.topic) args.push('--topic', params.topic)
-  if (params.outputDir) args.push('--output-dir', params.outputDir)
+  // Absolute output dir so run_complete.output_files are absolute paths the
+  // renderer can save/reveal regardless of the main process cwd.
+  args.push('--output-dir', params.outputDir ?? path.join(REPO_ROOT, 'output'))
 
   const send = (e: unknown) => {
     if (!win.isDestroyed()) win.webContents.send('pipeline:event', e)

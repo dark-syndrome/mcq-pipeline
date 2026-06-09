@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import SourceDropZone, { type SelectedFile } from '../components/SourceDropZone'
 import SourceQualityCard from '../components/SourceQualityCard'
 import RunConfigPanel, { type RunConfig } from '../components/RunConfigPanel'
+import RunExecution from '../components/RunExecution'
+import type { RunStartParams } from '../api'
 import type { AppConfig, LintReport } from '../types'
 
 export default function RunTab() {
@@ -10,7 +12,7 @@ export default function RunTab() {
   const [linting, setLinting] = useState(false)
   const [report, setReport] = useState<LintReport | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [runParams, setRunParams] = useState<RunStartParams | null>(null)
   const [config, setConfig] = useState<RunConfig>({
     count: 10,
     difficulty: 'medium',
@@ -38,7 +40,6 @@ export default function RunTab() {
   const onSelect = async (f: SelectedFile) => {
     setError(null)
     setReport(null)
-    setNotice(null)
     setFile(f)
     setConfig((c) => ({
       ...c,
@@ -59,7 +60,28 @@ export default function RunTab() {
   )
   const estimate = report ? estimateCost(sourceWords, config.count, appConfig) : null
   const canGenerate =
-    !!report && report.overall_status !== 'FAIL' && config.types.length > 0
+    !!file &&
+    !!report &&
+    report.overall_status !== 'FAIL' &&
+    config.types.length > 0
+
+  const onGenerate = () => {
+    if (!file || !canGenerate) return
+    setRunParams({
+      input: file.path,
+      count: config.count,
+      difficulty: config.difficulty,
+      // The CLI takes a single --type; only override when one is selected,
+      // otherwise let config.yaml (mixed_question_types) decide.
+      type: config.types.length === 1 ? config.types[0] : undefined,
+      topic: config.topic || undefined,
+    })
+  }
+
+  // Phase 3 replaces the upload + config view during/after execution.
+  if (runParams) {
+    return <RunExecution params={runParams} onReset={() => setRunParams(null)} />
+  }
 
   return (
     <div className="px-10 py-8">
@@ -90,10 +112,7 @@ export default function RunTab() {
           onChange={(p) => setConfig((c) => ({ ...c, ...p }))}
           estimate={estimate}
           canGenerate={canGenerate}
-          onGenerate={() =>
-            setNotice('Live execution (Phase 3) is built in Session 4.')
-          }
-          notice={notice}
+          onGenerate={onGenerate}
         />
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type {
   AppConfig,
+  FullConfig,
   LintReport,
   PipelineEvent,
   ProcessExitEvent,
@@ -26,12 +27,18 @@ export interface Api {
   }
   config: {
     get: () => Promise<AppConfig | null>
+    dump: (defaults?: boolean) => Promise<FullConfig>
+    write: (changes: Record<string, unknown>) => Promise<{ written: number }>
   }
   lint: {
     run: (input: string) => Promise<LintReport>
   }
   dialog: {
     openMarkdown: () => Promise<string | null>
+  }
+  file: {
+    saveCopy: (srcPath: string) => Promise<string | null>
+    showInFolder: (p: string) => Promise<void>
   }
   getPathForFile: (file: File) => string
   run: {

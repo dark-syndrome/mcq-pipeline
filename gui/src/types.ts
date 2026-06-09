@@ -124,6 +124,60 @@ export interface RowCounts {
   concept_maps: number
 }
 
+// --- Full resolved Settings (mcq-agent config-dump) for the Model tab ---
+interface PriceBlock {
+  input_per_million_tokens: number
+  output_per_million_tokens: number
+}
+export interface FullConfig {
+  provider: string
+  model: string
+  analyzer_provider: string | null
+  analyzer_model: string | null
+  generator_provider: string | null
+  generator_model: string | null
+  critic_provider: string | null
+  critic_model: string | null
+  num_questions: number
+  difficulty: string
+  question_type: string
+  num_options: number
+  include_explanations: boolean
+  over_generation_factor: number
+  max_regeneration_attempts: number
+  mixed_question_types: boolean
+  source_grounding_threshold: number
+  temperature: number
+  critic_temperature: number
+  analyzer_temperature: number
+  bloom_temperatures: {
+    remember: number
+    understand: number
+    apply: number
+    analyze: number
+    evaluate: number
+    create: number
+  }
+  max_tokens: number
+  critic_max_tokens: number
+  analyzer_max_tokens: number
+  guarantee_n_retries: number
+  linter_min_words: number
+  linter_min_sections: number
+  linter_min_words_per_section: number
+  linter_min_concept_density: number
+  linter_fail_on_warn: boolean
+  api_max_retries: number
+  api_retry_initial_backoff: number
+  pricing: PriceBlock
+  generator_pricing: PriceBlock
+  critic_pricing: PriceBlock
+  enable_supabase: boolean
+  supabase_similarity_threshold: number
+  include_rejected_in_output: boolean
+  [key: string]: unknown
+}
+
 // --- Layer-1 source linter report (mcq-agent lint --json) ---
 export type LintStatus = 'PASS' | 'WARN' | 'FAIL'
 export interface LintCheck {

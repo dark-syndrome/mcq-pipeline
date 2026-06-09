@@ -1,6 +1,9 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import fs from 'node:fs'
+import path from 'node:path'
 import * as db from './db'
 import { readConfig } from './config'
+import { dumpConfig, writeConfig } from './modelConfig'
 import { lintFile } from './lint'
 import { cancelRun, isRunning, startRun, type RunParams } from './sidecar'
 
@@ -13,6 +16,10 @@ export function registerIpc(): void {
   ipcMain.handle('db:reload', () => db.reload())
 
   ipcMain.handle('config:get', () => readConfig())
+  ipcMain.handle('config:dump', (_e, defaults?: boolean) => dumpConfig(!!defaults))
+  ipcMain.handle('config:write', (_e, changes: Record<string, unknown>) =>
+    writeConfig(changes),
+  )
 
   ipcMain.handle('lint:run', (_e, input: string) => lintFile(input))
 
@@ -24,6 +31,18 @@ export function registerIpc(): void {
     })
     return result.canceled ? null : result.filePaths[0]
   })
+
+  // Save a copy of a generated output file to a user-chosen location.
+  ipcMain.handle('file:saveCopy', async (e, srcPath: string) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const result = await dialog.showSaveDialog(win ?? undefined!, {
+      defaultPath: path.basename(srcPath),
+    })
+    if (result.canceled || !result.filePath) return null
+    await fs.promises.copyFile(srcPath, result.filePath)
+    return result.filePath
+  })
+  ipcMain.handle('file:showInFolder', (_e, p: string) => shell.showItemInFolder(p))
 
   ipcMain.handle('run:isRunning', () => isRunning())
   ipcMain.handle('run:start', (e, params: RunParams) => {
