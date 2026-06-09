@@ -22,31 +22,21 @@ export function isRunning(): boolean {
   return proc !== null
 }
 
-export function startRun(win: BrowserWindow, params: RunParams): void {
-  if (proc) throw new Error('A run is already in progress.')
-
+// Shared spawn/stream/error handling for any mcq_agent.cli subcommand that
+// emits --json-events NDJSON. Events are forwarded to the renderer on `channel`.
+function runSidecar(
+  win: BrowserWindow,
+  args: string[],
+  channel: string,
+): void {
+  if (proc) throw new Error('A pipeline operation is already in progress.')
   const py = resolvePython()
-  const args = [
-    '-m',
-    'mcq_agent.cli',
-    'generate',
-    '-i',
-    params.input,
-    '--json-events',
-  ]
-  if (params.count != null) args.push('--count', String(params.count))
-  if (params.difficulty) args.push('--difficulty', params.difficulty)
-  if (params.type) args.push('--type', params.type)
-  if (params.topic) args.push('--topic', params.topic)
-  // Absolute output dir so run_complete.output_files are absolute paths the
-  // renderer can save/reveal regardless of the main process cwd.
-  args.push('--output-dir', params.outputDir ?? path.join(REPO_ROOT, 'output'))
 
   const send = (e: unknown) => {
-    if (!win.isDestroyed()) win.webContents.send('pipeline:event', e)
+    if (!win.isDestroyed()) win.webContents.send(channel, e)
   }
 
-  proc = spawn(py, args, {
+  proc = spawn(py, ['-m', 'mcq_agent.cli', ...args], {
     cwd: REPO_ROOT,
     env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
   })
@@ -62,7 +52,6 @@ export function startRun(win: BrowserWindow, params: RunParams): void {
     }
   })
 
-  // Keep a tail of stderr so a non-zero exit can report a meaningful message.
   let stderrTail = ''
   proc.stderr!.on('data', (d: Buffer) => {
     stderrTail = (stderrTail + d.toString()).slice(-8000)
@@ -90,6 +79,30 @@ export function startRun(win: BrowserWindow, params: RunParams): void {
     send({ event: 'process_exit', code })
     proc = null
   })
+}
+
+export function startRun(win: BrowserWindow, params: RunParams): void {
+  const args = ['generate', '-i', params.input, '--json-events']
+  if (params.count != null) args.push('--count', String(params.count))
+  if (params.difficulty) args.push('--difficulty', params.difficulty)
+  if (params.type) args.push('--type', params.type)
+  if (params.topic) args.push('--topic', params.topic)
+  // Absolute output dir so run_complete.output_files are absolute paths the
+  // renderer can save/reveal regardless of the main process cwd.
+  args.push('--output-dir', params.outputDir ?? path.join(REPO_ROOT, 'output'))
+  runSidecar(win, args, 'pipeline:event')
+}
+
+// Push a run's accepted MCQs to Supabase through the Python dedup gate (§5.7).
+// Streams push_start / push_preview / push_done on the 'supabase:event' channel.
+export function startSupabasePush(
+  win: BrowserWindow,
+  opts: { runId?: string; dryRun?: boolean },
+): void {
+  const args = ['push-supabase', '--json-events']
+  if (opts.runId) args.push('--run-id', opts.runId)
+  if (opts.dryRun) args.push('--dry-run')
+  runSidecar(win, args, 'supabase:event')
 }
 
 export function cancelRun(): void {

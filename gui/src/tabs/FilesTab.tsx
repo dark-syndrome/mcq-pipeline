@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import FilterBuilder from '../files/FilterBuilder'
 import ResultsPreview from '../files/ResultsPreview'
+import ExportPanel from '../files/ExportPanel'
+import DbManagementPanel from '../files/DbManagementPanel'
+import { useStore } from '../store'
 import type { FilterOptions, McqFilter, QueryResult } from '../types'
 
 // §5.1 three-panel layout: Filter Builder | Results Preview | Export (Session 8).
@@ -12,6 +15,7 @@ export default function FilesTab() {
   const [error, setError] = useState<string | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
   const debounce = useRef<ReturnType<typeof setTimeout>>()
+  const supabaseEnabled = useStore((s) => s.status.supabaseEnabled)
 
   // Load filter-control options once.
   useEffect(() => {
@@ -84,20 +88,17 @@ export default function FilesTab() {
           onToggleExclude={toggleExclude}
         />
 
-        {/* Export panel — built in Session 8 (§5.6) */}
-        <div className="w-[240px] shrink-0 border-l border-border bg-surface p-4">
-          <h3 className="text-sm font-semibold text-muted">Export</h3>
-          <div className="mt-3 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">
-            JSON / DOCX / PDF export and the DB management panel arrive in
-            Session 8.
-          </div>
-          <p className="mt-3 text-[11px] text-muted">
-            {result
-              ? `${result.rows.filter((r) => !excluded.has(r.id)).length} selected for export`
-              : ''}
-          </p>
-        </div>
+        {/* Export panel (§5.6) — exports the selected set (rows − excluded). */}
+        <ExportPanel
+          rows={(result?.rows ?? []).filter((r) => !excluded.has(r.id))}
+        />
       </div>
+
+      {/* DB management (§5.7) */}
+      <DbManagementPanel
+        runs={options?.runs ?? []}
+        supabaseEnabled={supabaseEnabled}
+      />
     </div>
   )
 }

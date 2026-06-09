@@ -422,3 +422,62 @@ export async function queryMcqs(filter: McqFilter = {}): Promise<QueryResult> {
   )
   return { rows: parseRows(rows), totalMatched, totalBank, buckets: null }
 }
+
+// --- DB management panel (§5.7) ---
+
+// SQLite status: path, size, row counts, and concept-map cache contents.
+export async function dbStatus(): Promise<{
+  exists: boolean
+  path: string
+  sizeBytes: number
+  counts: { runs: number; mcqs: number; concept_maps: number }
+  conceptMaps: { source_file: string; created_at: string }[]
+}> {
+  const counts = await rowCounts()
+  const exists = fs.existsSync(DB_PATH)
+  const sizeBytes = exists ? fs.statSync(DB_PATH).size : 0
+  const d = await ensure()
+  const conceptMaps = d
+    ? rowsToObjects(
+        d,
+        `SELECT source_file, created_at FROM concept_maps ORDER BY created_at DESC`,
+      ).map((r) => ({
+        source_file: String(r.source_file ?? ''),
+        created_at: String(r.created_at ?? ''),
+      }))
+    : []
+  return { exists, path: DB_PATH, sizeBytes, counts, conceptMaps }
+}
+
+// Integrity + orphan check for the DB Health Check (§5.7).
+export async function dbHealth(): Promise<{
+  ok: boolean
+  integrity: string
+  orphanedMcqs: number
+}> {
+  const d = await ensure()
+  if (!d) return { ok: false, integrity: 'database not found', orphanedMcqs: 0 }
+  const integrityRow = d.exec('PRAGMA integrity_check')
+  const integrity = integrityRow.length
+    ? String(integrityRow[0].values[0][0])
+    : 'unknown'
+  const orphanedMcqs = scalar(
+    d,
+    `SELECT COUNT(*) FROM mcqs m
+      WHERE NOT EXISTS (SELECT 1 FROM runs r WHERE r.run_id = m.run_id)`,
+  )
+  return { ok: integrity === 'ok' && orphanedMcqs === 0, integrity, orphanedMcqs }
+}
+
+// Clear the concept-map cache (§5.7) — the ONLY GUI-side DB write, gated by a
+// confirm in the UI. sql.js works on an in-memory snapshot, so the modified DB
+// must be exported back to disk; then drop the snapshot so reads re-read it.
+export async function clearConceptCache(): Promise<{ cleared: number }> {
+  const d = await ensure()
+  if (!d) return { cleared: 0 }
+  const before = scalar(d, 'SELECT COUNT(*) FROM concept_maps')
+  d.run('DELETE FROM concept_maps')
+  fs.writeFileSync(DB_PATH, Buffer.from(d.export()))
+  reload()
+  return { cleared: before }
+}

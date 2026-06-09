@@ -17,6 +17,21 @@ const api = {
     costPerRun: (limit?: number) => ipcRenderer.invoke('db:costPerRun', limit),
     filterOptions: () => ipcRenderer.invoke('db:filterOptions'),
     queryMcqs: (filter?: unknown) => ipcRenderer.invoke('db:queryMcqs', filter),
+    status: () => ipcRenderer.invoke('db:status'),
+    health: () => ipcRenderer.invoke('db:health'),
+    clearConceptCache: () => ipcRenderer.invoke('db:clearConceptCache'),
+  },
+  export: {
+    run: (rows: unknown, opts: unknown, defaultName: string) =>
+      ipcRenderer.invoke('export:run', rows, opts, defaultName),
+  },
+  supabase: {
+    push: (opts: unknown) => ipcRenderer.invoke('supabase:push', opts),
+    onEvent: (cb: (e: unknown) => void) => {
+      const listener = (_: unknown, e: unknown) => cb(e)
+      ipcRenderer.on('supabase:event', listener)
+      return () => ipcRenderer.removeListener('supabase:event', listener)
+    },
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),

@@ -486,5 +486,119 @@ def show_run(
         err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
+
+@app.command(name="push-supabase")
+def push_supabase(
+    run_id: Annotated[str | None, typer.Option(
+        "--run-id", help="Run UUID to push. Defaults to the most recent run."
+    )] = None,
+    dry_run: Annotated[bool, typer.Option(
+        "--dry-run", help="Compute the dedup preview without writing to Supabase."
+    )] = False,
+    config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
+    json_events: Annotated[bool, typer.Option(
+        "--json-events", help="Emit NDJSON events to stdout (for the GUI)."
+    )] = False,
+) -> None:
+    """
+    Push a run's accepted MCQs to Supabase through the similarity dedup gate.
+
+    Reuses the same `supabase_gate` used by the live pipeline, so dedup behaviour
+    is identical. With --dry-run, runs the read-only preview (fetch + filter) and
+    reports how many questions would be pushed vs skipped as duplicates, without
+    writing anything. Drives the Files-tab "Push to Supabase" panel (GUI §5.7).
+    """
+    from . import supabase_gate
+
+    def emit_or_print(payload: dict) -> None:
+        if json_events:
+            _emit(payload)
+
+    try:
+        settings = load_config(config)
+
+        if not settings.enable_supabase:
+            msg = "Supabase is disabled (enable_supabase: false in config.yaml)."
+            if json_events:
+                _emit({"event": "push_done", "ok": False, "disabled": True, "message": msg})
+            else:
+                console.print(f"[yellow]{msg}[/yellow]")
+            raise typer.Exit(code=0)
+
+        db_path = Path(settings.log_db_path)
+
+        # Resolve the run: explicit --run-id, else the most recent.
+        if run_id is None:
+            recent = storage.list_recent_runs(db_path, limit=1)
+            if not recent:
+                raise RuntimeError("No runs found in the database.")
+            run_id = str(recent[0]["run_id"])
+
+        run = storage.get_run(run_id, db_path)
+        if run is None:
+            raise RuntimeError(f"Run not found: {run_id}")
+
+        threshold = settings.supabase_similarity_threshold
+        emit_or_print({
+            "event": "push_start",
+            "run_id": run.run_id,
+            "dry_run": dry_run,
+            "submitted": len(run.final_mcqs),
+            "threshold": threshold,
+        })
+
+        if dry_run:
+            result = supabase_gate.preview_sync(run, threshold=threshold)
+        else:
+            result = supabase_gate.filter_and_sync(run, threshold=threshold)
+
+        # Compact the flagged duplicates for the GUI preview.
+        skipped = [
+            {
+                "question": str(item["question"].get("question", ""))[:160],
+                "score": round(float(item["score"]), 1),
+                "source": item.get("source", ""),
+            }
+            for item in result.flagged
+        ]
+
+        if json_events:
+            _emit({
+                "event": "push_preview" if dry_run else "push_pushed",
+                "would_push": result.pushed,
+                "would_skip": skipped,
+                "submitted": result.submitted,
+                "filtered": result.filtered,
+            })
+            _emit({
+                "event": "push_done",
+                "ok": True,
+                "dry_run": dry_run,
+                "pushed": result.pushed,
+                "filtered": result.filtered,
+                "first_question_number": result.first_question_number,
+                "last_question_number": result.last_question_number,
+            })
+        else:
+            verb = "Would push" if dry_run else "Pushed"
+            console.print(
+                f"[green]{verb}[/green] {result.pushed} question(s); "
+                f"{result.filtered} skipped as duplicates "
+                f"(threshold {threshold})."
+            )
+            if dry_run and skipped:
+                console.print("\n[yellow]Duplicates that would be skipped:[/yellow]")
+                for s in skipped:
+                    console.print(f"  [{s['score']}] ({s['source']}) {s['question']}")
+
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        if json_events:
+            _emit({"event": "push_done", "ok": False, "message": str(exc)})
+        else:
+            err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
 if __name__ == "__main__":
     app()

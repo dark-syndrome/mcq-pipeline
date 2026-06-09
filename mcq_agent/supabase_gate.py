@@ -100,6 +100,39 @@ def _max_question_number(existing: list[dict]) -> int:
 # Main gate function
 # ---------------------------------------------------------------------------
 
+def preview_sync(run: PipelineRun, threshold: int = DEFAULT_THRESHOLD) -> SyncResult:
+    """
+    Read-only dry run of the similarity gate: fetch existing Supabase questions
+    and run the dedup filter, but DO NOT push anything. Returns the same
+    SyncResult shape as filter_and_sync (pushed = would-be-pushed count) so the
+    GUI can show an accurate "would push N, skip M as duplicates" preview.
+    """
+    from . import supabase_storage
+
+    sb = supabase_storage._client()
+    existing = _fetch_all_accepted(sb)
+    candidate_dicts: list[dict] = [
+        json.loads(mcq.model_dump_json()) for mcq in run.final_mcqs
+    ]
+    accepted_dicts, flagged_items = filter_questions(
+        candidates=candidate_dicts,
+        existing=existing,
+        threshold=threshold,
+        check_intra=True,
+    )
+    next_q_num = _max_question_number(existing) + 1
+    n_accepted = len(accepted_dicts)
+    return SyncResult(
+        generation_number=run.generation_number,
+        submitted=len(run.final_mcqs),
+        pushed=n_accepted,
+        filtered=len(flagged_items),
+        first_question_number=next_q_num if n_accepted else None,
+        last_question_number=(next_q_num + n_accepted - 1) if n_accepted else None,
+        flagged=flagged_items,
+    )
+
+
 def filter_and_sync(run: PipelineRun, threshold: int = DEFAULT_THRESHOLD) -> SyncResult:
     """
     Run similarity gate then push the filtered run to Supabase.

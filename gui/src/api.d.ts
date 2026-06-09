@@ -2,17 +2,22 @@ import type {
   AppConfig,
   CostPoint,
   DashboardKpis,
+  DbHealth,
+  DbStatus,
   DifficultySlice,
+  ExportOptions,
   FilterOptions,
   FullConfig,
   GenerationBar,
   LintReport,
   McqFilter,
+  McqRow,
   PipelineEvent,
   ProcessExitEvent,
   QueryResult,
   RowCounts,
   RunRow,
+  SupabasePushEvent,
   TypeSlice,
 } from './types'
 
@@ -39,6 +44,20 @@ export interface Api {
     costPerRun: (limit?: number) => Promise<CostPoint[]>
     filterOptions: () => Promise<FilterOptions>
     queryMcqs: (filter?: McqFilter) => Promise<QueryResult>
+    status: () => Promise<DbStatus>
+    health: () => Promise<DbHealth>
+    clearConceptCache: () => Promise<{ cleared: number }>
+  }
+  export: {
+    run: (
+      rows: McqRow[],
+      opts: ExportOptions,
+      defaultName: string,
+    ) => Promise<string | null>
+  }
+  supabase: {
+    push: (opts: { runId?: string; dryRun?: boolean }) => Promise<void>
+    onEvent: (cb: (e: SupabasePushEvent) => void) => () => void
   }
   config: {
     get: () => Promise<AppConfig | null>

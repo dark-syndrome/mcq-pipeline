@@ -1176,10 +1176,12 @@ session-by-session in [`docs/BUILD_CHECKLIST.md`](docs/BUILD_CHECKLIST.md) again
 Functional so far: nav shell + status bar, Python-sidecar IPC, the **Run** tab (upload → linter →
 config → live execution), the **Model** tab (full config.yaml editor), the **Dashboard** KPI
 strip + Overview sub-tab (4 Recharts charts: questions-per-generation, type donut, cost-per-run,
-difficulty distribution), and the **Files** tab filter builder + results preview (graphical query
+difficulty distribution), the **Files** tab filter builder + results preview (graphical query
 over the DB: difficulty/bloom/type/source-file/heading/date filters, ratio picker, fetch modes,
-card & table views). All read `logs/runs.db` read-only via `sql.js`. Remaining: Files export +
-DB-management panel, the Eval Set tab, and Dashboard sub-tabs 2–4.
+card & table views), plus **export** (JSON/DOCX/PDF — PDF via Electron's bundled Chromium, DOCX via
+the `docx` package) and a **DB-management panel** (SQLite status, health check, concept-cache clear,
+and Supabase push through the Python dedup gate). All reads use `sql.js` read-only. Remaining: the
+Eval Set tab and Dashboard sub-tabs 2–4.
 
 ---
 

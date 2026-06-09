@@ -215,6 +215,66 @@ export interface QueryResult {
   buckets: { difficulty: string; requested: number; got: number }[] | null
 }
 
+// --- Files export (§5.6) ---
+export type ExportFormat = 'json' | 'docx' | 'pdf'
+export interface ExportOptions {
+  format: ExportFormat
+  includeExplanation?: boolean
+  includeRationale?: boolean
+  answerKey?: boolean
+  explanations?: boolean
+  metadata?: boolean
+  coverPage?: boolean
+  topic?: string
+}
+
+// --- DB management panel (§5.7) ---
+export interface DbStatus {
+  exists: boolean
+  path: string
+  sizeBytes: number
+  counts: { runs: number; mcqs: number; concept_maps: number }
+  conceptMaps: { source_file: string; created_at: string }[]
+}
+export interface DbHealth {
+  ok: boolean
+  integrity: string
+  orphanedMcqs: number
+}
+
+// --- Supabase push events (cli.py push-supabase --json-events) ---
+export interface PushStartEvent {
+  event: 'push_start'
+  run_id: string
+  dry_run: boolean
+  submitted: number
+  threshold: number
+}
+export interface PushPreviewEvent {
+  event: 'push_preview' | 'push_pushed'
+  would_push: number
+  would_skip: { question: string; score: number; source: string }[]
+  submitted: number
+  filtered: number
+}
+export interface PushDoneEvent {
+  event: 'push_done'
+  ok: boolean
+  dry_run?: boolean
+  disabled?: boolean
+  message?: string
+  pushed?: number
+  filtered?: number
+  first_question_number?: number | null
+  last_question_number?: number | null
+}
+export type SupabasePushEvent =
+  | PushStartEvent
+  | PushPreviewEvent
+  | PushDoneEvent
+  | ErrorEvent
+  | ProcessExitEvent
+
 // --- Full resolved Settings (mcq-agent config-dump) for the Model tab ---
 interface PriceBlock {
   input_per_million_tokens: number
