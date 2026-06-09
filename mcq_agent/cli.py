@@ -418,3 +418,6 @@ def show_run(
     except Exception as exc:
         err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
+
+if __name__ == "__main__":
+    app()
