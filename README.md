@@ -1174,10 +1174,12 @@ session-by-session in [`docs/BUILD_CHECKLIST.md`](docs/BUILD_CHECKLIST.md) again
 [`docs/GUI_SPEC.md`](docs/GUI_SPEC.md). Run it with `cd gui && npm run dev`.
 
 Functional so far: nav shell + status bar, Python-sidecar IPC, the **Run** tab (upload → linter →
-config → live execution), the **Model** tab (full config.yaml editor), and the **Dashboard** KPI
+config → live execution), the **Model** tab (full config.yaml editor), the **Dashboard** KPI
 strip + Overview sub-tab (4 Recharts charts: questions-per-generation, type donut, cost-per-run,
-difficulty distribution). Charts read `logs/runs.db` read-only via `sql.js`. Remaining: Files tab +
-export, the Eval Set tab, and Dashboard sub-tabs 2–4.
+difficulty distribution), and the **Files** tab filter builder + results preview (graphical query
+over the DB: difficulty/bloom/type/source-file/heading/date filters, ratio picker, fetch modes,
+card & table views). All read `logs/runs.db` read-only via `sql.js`. Remaining: Files export +
+DB-management panel, the Eval Set tab, and Dashboard sub-tabs 2–4.
 
 ---
 

@@ -157,6 +157,64 @@ export interface CostPoint {
   cost_usd: number
 }
 
+// --- Files tab (§5.1–5.5) ---
+export interface McqOption {
+  label: string
+  text: string
+  is_correct: boolean
+  distractor_rationale: string | null
+}
+export interface McqRow {
+  id: number
+  run_id: string
+  question_number: number | null
+  passed: boolean
+  generation_number: number
+  input_file: string
+  source_file: string // basename of input_file
+  timestamp: string
+  question: string
+  options: McqOption[]
+  explanation: string | null
+  source_excerpt: string | null
+  source_heading: string
+  bloom_level: string
+  difficulty: string
+  question_type: string
+}
+export interface DifficultyRatio {
+  easy: number
+  medium: number
+  hard: number
+  expert: number
+}
+export type FetchMode = 'sequential' | 'random' | 'stratified'
+export interface McqFilter {
+  sourceFiles?: string[]
+  runIds?: string[]
+  difficulties?: Difficulty[]
+  blooms?: BloomLevel[]
+  types?: QuestionType[]
+  sourceHeadings?: string[]
+  dateFrom?: string
+  dateTo?: string
+  passedOnly?: boolean
+  fetchMode?: FetchMode
+  limit?: number
+  ratio?: DifficultyRatio
+}
+export interface FilterOptions {
+  sourceFiles: { path: string; label: string }[]
+  sourceHeadings: string[]
+  runs: { run_id: string; generation_number: number; label: string }[]
+}
+export interface QueryResult {
+  rows: McqRow[]
+  totalMatched: number
+  totalBank: number
+  buckets: { difficulty: string; requested: number; got: number }[] | null
+}
+
 // --- Full resolved Settings (mcq-agent config-dump) for the Model tab ---
 interface PriceBlock {
   input_per_million_tokens: number

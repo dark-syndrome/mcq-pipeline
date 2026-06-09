@@ -15,6 +15,8 @@ const api = {
     difficultyDistribution: () =>
       ipcRenderer.invoke('db:difficultyDistribution'),
     costPerRun: (limit?: number) => ipcRenderer.invoke('db:costPerRun', limit),
+    filterOptions: () => ipcRenderer.invoke('db:filterOptions'),
+    queryMcqs: (filter?: unknown) => ipcRenderer.invoke('db:queryMcqs', filter),
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),

@@ -17,6 +17,7 @@ Status keys: `[ ]` not started · `[~]` in progress · `[x]` done
 The Electron app lives in **`gui/`** (separate from the Python package). Run it with `cd gui && npm run dev`; build with `npm run build`.
 
 ### Stack deviations from the spec (with rationale)
+- **Files tab "Topic" filter is a "Source File" filter** (Session 7, spec §5.2). The spec maps Topic to `runs.topic` or an `mcq_tags` table — neither exists in this SQLite schema (`runs` has only `input_file`; `mcqs` have no tags). The filter is backed by distinct `runs.input_file` basenames instead. All other §5.2 filters (difficulty/bloom/type/source_heading via `json_extract`, date via `runs.timestamp`, passed-only) map cleanly. Filter inputs use **sql.js prepared-statement params** (`rowsToObjectsParams` in `db.ts`), not string interpolation. Export (§5.6) + DB mgmt (§5.7) deferred to Session 8 — the export panel is a disabled stub but selection plumbing (excluded-id set) is already wired.
 - **Recharts added in Session 6** (`recharts@3.x`, spec §8.1) — dashboard charts. Recharts 3.x widened tooltip/label `formatter` param types to `ValueType | undefined`; coerce with `Number(v)` inside formatters.
 - **Cost Per Run chart is a single total-cost line, not the spec's 3 per-stage lines** (§4.2). The DB persists only aggregate `cost_usd` + total tokens per run — per-stage cost exists only live on `run_complete.cost_breakdown`, not in `runs`. Chart subtitle documents this. Upgrade to 3 lines if/when the pipeline persists per-stage cost.
 - **Dashboard "Reframer Salvage Rate" KPI shows "—"** (§4.1): salvage is not persisted per-question in `mcqs` (no reframer-class column), so it can't be computed read-only. Card renders "—" with a "not persisted in DB" hint. Resolvable by persisting a salvaged flag when the Run-tab `question_rejected`/salvage events are wired (see GAP rows below).
@@ -43,7 +44,7 @@ The Electron app lives in **`gui/`** (separate from the Python package). Run it 
 | 4 | Run tab Phase 3 (live stage timeline + accepted feed + completion card; session-cost + DB reconcile) | 6.1, 10.2 | 3 | `[x]` |
 | 5 | Model tab (6 config sections, profile save/load, non-destructive comment-preserving save) | 3 | 2 | `[x]` |
 | 6 | Dashboard KPI strip + Overview sub-tab (4 charts) | 4.1, 4.2 | 2 | `[x]` |
-| 7 | Files tab (filter builder + results preview) | 5.1–5.5, 10.3 | 2 | `[ ]` |
+| 7 | Files tab (filter builder + results preview) | 5.1–5.5, 10.3 | 2 | `[x]` |
 | 8 | Files export (JSON/DOCX/PDF) + DB mgmt panel | 5.6, 5.7 | 7 | `[ ]` |
 | 9 | Dashboard sub-tabs 2–4 (quality heatmap, cost/tokens, run history) | 4.2 | 6 | `[ ]` |
 | 10 | Eval Set tab (browse/annotate, table, management) | 7 | 7 | `[ ]` |

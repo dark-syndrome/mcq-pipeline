@@ -3,11 +3,14 @@ import type {
   CostPoint,
   DashboardKpis,
   DifficultySlice,
+  FilterOptions,
   FullConfig,
   GenerationBar,
   LintReport,
+  McqFilter,
   PipelineEvent,
   ProcessExitEvent,
+  QueryResult,
   RowCounts,
   RunRow,
   TypeSlice,
@@ -34,6 +37,8 @@ export interface Api {
     typeDistribution: () => Promise<TypeSlice[]>
     difficultyDistribution: () => Promise<DifficultySlice[]>
     costPerRun: (limit?: number) => Promise<CostPoint[]>
+    filterOptions: () => Promise<FilterOptions>
+    queryMcqs: (filter?: McqFilter) => Promise<QueryResult>
   }
   config: {
     get: () => Promise<AppConfig | null>

@@ -21,6 +21,10 @@ export function registerIpc(): void {
   ipcMain.handle('db:typeDistribution', () => db.typeDistribution())
   ipcMain.handle('db:difficultyDistribution', () => db.difficultyDistribution())
   ipcMain.handle('db:costPerRun', (_e, limit?: number) => db.costPerRun(limit))
+  ipcMain.handle('db:filterOptions', () => db.filterOptions())
+  ipcMain.handle('db:queryMcqs', (_e, filter?: db.McqFilter) =>
+    db.queryMcqs(filter ?? {}),
+  )
 
   ipcMain.handle('config:get', () => readConfig())
   ipcMain.handle('config:dump', (_e, defaults?: boolean) => dumpConfig(!!defaults))
