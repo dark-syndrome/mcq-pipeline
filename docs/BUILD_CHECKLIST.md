@@ -1,0 +1,76 @@
+# MCQ Pipeline GUI — Build Checklist
+
+Living progress tracker for the Electron GUI described in [`GUI_SPEC.md`](./GUI_SPEC.md).
+**Every build session starts by reading this file + the one relevant spec section.**
+Do not re-read the whole spec or the whole codebase. Update statuses + commit at the end of each session.
+
+Status keys: `[ ]` not started · `[~]` in progress · `[x]` done
+
+---
+
+## How to run a session (token-discipline rules)
+1. Read this checklist + the spec section for the slice you're building + the frozen contract files (below). Nothing else up front.
+2. Build **one slice** (one row in the sequence table). Keep components small and file-scoped.
+3. Run the relevant check (tests / `npm run dev`), update this file, **commit**. The commit is the context boundary — the next session needs only this file, not the prior conversation.
+4. Delegate isolated leaf components (e.g. a single Recharts chart given a data shape) to a subagent so the main thread stays lean.
+
+The Electron app lives in **`gui/`** (separate from the Python package). Run it with `cd gui && npm run dev`; build with `npm run build`.
+
+## Frozen contracts (read these in every tab session)
+| Contract | Location | Status |
+|---|---|---|
+| IPC event protocol (Python→JS NDJSON) | `mcq_agent/cli.py` header + `GUI_SPEC.md` §8.2; mirrored in `gui/src/types.ts` | `[x]` frozen |
+| IPC API surface (main↔renderer) | `gui/electron/preload.ts` stub → real in Session 2 | `[~]` stub only |
+| Shared TS types + Tailwind theme tokens | `gui/src/types.ts`, `gui/tailwind.config.js` | `[x]` frozen |
+
+---
+
+## Session sequence
+| # | Slice | Spec § | Depends on | Status |
+|---|---|---|---|---|
+| 0 | Spec→repo, checklist, memory, reconcile §8.2 event schema | 8.2, 9.1 | — | `[x]` |
+| 1 | Electron+Vite+React+Tailwind scaffold; nav rail + status bar shell; Zustand store; theme tokens; home banner; 5 placeholder tabs | 2, 8.1, 8.3, 10 | 0 | `[x]` |
+| 2 | IPC layer: sidecar spawn/stream + better-sqlite3 query stubs | 8.1, 8.2 | 1 | `[ ]` |
+| 3 | Run tab Phase 1+2 (upload, Layer-1 linter card, run config) | 6.1 | 2 | `[ ]` |
+| 4 | Run tab Phase 3 (live stage timeline + accepted feed + completion card) | 6.1, 10.2 | 3 | `[ ]` |
+| 5 | Model tab (6 config sections, profile save/load) — needs Bloom config schema first | 3 | 2 | `[ ]` |
+| 6 | Dashboard KPI strip + Overview sub-tab (4 charts) | 4.1, 4.2 | 2 | `[ ]` |
+| 7 | Files tab (filter builder + results preview) | 5.1–5.5, 10.3 | 2 | `[ ]` |
+| 8 | Files export (JSON/DOCX/PDF) + DB mgmt panel | 5.6, 5.7 | 7 | `[ ]` |
+| 9 | Dashboard sub-tabs 2–4 (quality heatmap, cost/tokens, run history) | 4.2 | 6 | `[ ]` |
+| 10 | Eval Set tab (browse/annotate, table, management) | 7 | 7 | `[ ]` |
+
+---
+
+## Pipeline-side prep (Python — Open Items §11.1)
+| Item | Spec ref | Status | Notes |
+|---|---|---|---|
+| `--json-events` NDJSON stream | Open #1 (P0) | `[x]` | `cli.py:58–`; structlog→GUI protocol |
+| `--count` / `--difficulty` (+ `--type`, `--topic`) overrides | Open #2 / §9.1 | `[x]` | `cli.py` generate command |
+| Exceptions emitted as `error` events | §9.1 | `[x]` | `cli.py` except block |
+| `run_complete` with cost_breakdown + output_files | §8.2 | `[x]` | `cli.py` |
+| Per-stage tokens/cost on `stage_done` (analyze) + `stage_progress` (generate) | §8.2 | `[x]` | Session 0 — wired from `analyze_usage`/`gen_usage` |
+| `cache_hit` field naming aligned with §8.2 | §8.2 | `[x]` | Session 0 (was `cached`) |
+| `question_rejected` event | §8.2 | `[ ]` | **GAP** — spec defines it; not emitted. Add when Run-tab rejection feed needs it |
+| Per-stage cost for `generate`/`critic` on `stage_done` | §8.2 | `[ ]` | Currently only aggregate in `run_complete.cost_breakdown` (generate is a retry loop) |
+| Per-Bloom-level temperature config schema | Open #5 (P2) | `[ ]` | **Blocks Model tab §3.4.** `config.yaml` has single `temperature` + per-stage temps only |
+| venv Python path resolution for Electron sidecar | Open #2 (P0) | `[ ]` | Electron-side; resolve in Session 2 |
+| Supabase service_role key access from Electron | Open #4 (P1) | `[ ]` | Electron-side; resolve in Session 8 |
+| DOCX export field schema decision | Open #3 (P1) | `[ ]` | Content team; blocks Session 8 |
+
+---
+
+## Troubleshooting (environment quirks)
+- **"Electron failed to install correctly" on `npm run dev`** (seen on this Windows machine): Electron's `install.js` uses `extract-zip`, which silently fails mid-extract here — it leaves only `node_modules/electron/dist/LICENSES.chromium.html` and exits 0. The full zip *is* cached at `%LOCALAPPDATA%\electron\Cache\<hash>\electron-v33.*-win32-x64.zip`. Fix without re-downloading:
+  ```powershell
+  $zip = Get-ChildItem "$env:LOCALAPPDATA\electron\Cache" -Recurse -Filter *.zip | Select -First 1
+  Remove-Item -Recurse -Force node_modules\electron\dist
+  Expand-Archive $zip.FullName node_modules\electron\dist -Force
+  Set-Content node_modules\electron\path.txt "electron.exe" -NoNewline -Encoding ascii
+  ```
+  Recurs after any `node_modules` wipe / fresh `npm install`. Verify with `node -e "console.log(require('electron'))"`.
+
+## Decisions / open questions to resolve before the slice that needs them
+- **Bloom temperature schema** (before Session 5): how to represent the 6-level temp matrix in `config.yaml` (e.g. `bloom_temperatures: {remember: 0.5, ...}`) and thread it into the Generator.
+- **DOCX export fields** (before Session 8): which MCQ fields included vs hidden by default.
+- **venv resolution** (during Session 2): how the Electron sidecar locates the activated venv Python on NxtWave machines.
