@@ -17,6 +17,9 @@ Status keys: `[ ]` not started · `[~]` in progress · `[x]` done
 The Electron app lives in **`gui/`** (separate from the Python package). Run it with `cd gui && npm run dev`; build with `npm run build`.
 
 ### Stack deviations from the spec (with rationale)
+- **Recharts added in Session 6** (`recharts@3.x`, spec §8.1) — dashboard charts. Recharts 3.x widened tooltip/label `formatter` param types to `ValueType | undefined`; coerce with `Number(v)` inside formatters.
+- **Cost Per Run chart is a single total-cost line, not the spec's 3 per-stage lines** (§4.2). The DB persists only aggregate `cost_usd` + total tokens per run — per-stage cost exists only live on `run_complete.cost_breakdown`, not in `runs`. Chart subtitle documents this. Upgrade to 3 lines if/when the pipeline persists per-stage cost.
+- **Dashboard "Reframer Salvage Rate" KPI shows "—"** (§4.1): salvage is not persisted per-question in `mcqs` (no reframer-class column), so it can't be computed read-only. Card renders "—" with a "not persisted in DB" hint. Resolvable by persisting a salvaged flag when the Run-tab `question_rejected`/salvage events are wired (see GAP rows below).
 - **DB access uses `sql.js` (WASM), not `better-sqlite3`** (spec §8.1). This machine has no C++ toolchain (no VS Build Tools / `cl.exe`), so `better-sqlite3`'s native rebuild against Electron's ABI can't compile. GUI DB access is read-only (the Python pipeline owns all writes), so an in-memory WASM snapshot is sufficient. `gui/electron/db.ts` caches the snapshot and exposes `reload()` to re-read after a run. Reversible: swap to `better-sqlite3` if a C++ toolchain is installed and interactive perf on a large DB ever demands native bindings.
 
 ## Frozen contracts (read these in every tab session)
@@ -37,7 +40,7 @@ The Electron app lives in **`gui/`** (separate from the Python package). Run it 
 | 3 | Run tab Phase 1+2 (upload, Layer-1 linter card, run config, pre-flight estimate) | 6.1 | 2 | `[x]` |
 | 4 | Run tab Phase 3 (live stage timeline + accepted feed + completion card; session-cost + DB reconcile) | 6.1, 10.2 | 3 | `[x]` |
 | 5 | Model tab (6 config sections, profile save/load, non-destructive comment-preserving save) | 3 | 2 | `[x]` |
-| 6 | Dashboard KPI strip + Overview sub-tab (4 charts) | 4.1, 4.2 | 2 | `[ ]` |
+| 6 | Dashboard KPI strip + Overview sub-tab (4 charts) | 4.1, 4.2 | 2 | `[x]` |
 | 7 | Files tab (filter builder + results preview) | 5.1–5.5, 10.3 | 2 | `[ ]` |
 | 8 | Files export (JSON/DOCX/PDF) + DB mgmt panel | 5.6, 5.7 | 7 | `[ ]` |
 | 9 | Dashboard sub-tabs 2–4 (quality heatmap, cost/tokens, run history) | 4.2 | 6 | `[ ]` |

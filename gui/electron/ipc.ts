@@ -14,6 +14,13 @@ export function registerIpc(): void {
   ipcMain.handle('db:recentRuns', (_e, limit?: number) => db.recentRuns(limit))
   ipcMain.handle('db:lastRun', () => db.lastRun())
   ipcMain.handle('db:reload', () => db.reload())
+  ipcMain.handle('db:dashboardKpis', () => db.dashboardKpis())
+  ipcMain.handle('db:questionsPerGeneration', (_e, limit?: number) =>
+    db.questionsPerGeneration(limit),
+  )
+  ipcMain.handle('db:typeDistribution', () => db.typeDistribution())
+  ipcMain.handle('db:difficultyDistribution', () => db.difficultyDistribution())
+  ipcMain.handle('db:costPerRun', (_e, limit?: number) => db.costPerRun(limit))
 
   ipcMain.handle('config:get', () => readConfig())
   ipcMain.handle('config:dump', (_e, defaults?: boolean) => dumpConfig(!!defaults))

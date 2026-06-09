@@ -1,11 +1,16 @@
 import type {
   AppConfig,
+  CostPoint,
+  DashboardKpis,
+  DifficultySlice,
   FullConfig,
+  GenerationBar,
   LintReport,
   PipelineEvent,
   ProcessExitEvent,
   RowCounts,
   RunRow,
+  TypeSlice,
 } from './types'
 
 export interface RunStartParams {
@@ -24,6 +29,11 @@ export interface Api {
     recentRuns: (limit?: number) => Promise<RunRow[]>
     lastRun: () => Promise<RunRow | null>
     reload: () => Promise<void>
+    dashboardKpis: () => Promise<DashboardKpis>
+    questionsPerGeneration: (limit?: number) => Promise<GenerationBar[]>
+    typeDistribution: () => Promise<TypeSlice[]>
+    difficultyDistribution: () => Promise<DifficultySlice[]>
+    costPerRun: (limit?: number) => Promise<CostPoint[]>
   }
   config: {
     get: () => Promise<AppConfig | null>

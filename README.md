@@ -1167,6 +1167,20 @@ Text muted      #64748b   slate grey
 
 ---
 
+### Electron build status (Phase 2, in progress)
+
+The production GUI is being built as an Electron + React + Tailwind app under `gui/`, tracked
+session-by-session in [`docs/BUILD_CHECKLIST.md`](docs/BUILD_CHECKLIST.md) against
+[`docs/GUI_SPEC.md`](docs/GUI_SPEC.md). Run it with `cd gui && npm run dev`.
+
+Functional so far: nav shell + status bar, Python-sidecar IPC, the **Run** tab (upload → linter →
+config → live execution), the **Model** tab (full config.yaml editor), and the **Dashboard** KPI
+strip + Overview sub-tab (4 Recharts charts: questions-per-generation, type donut, cost-per-run,
+difficulty distribution). Charts read `logs/runs.db` read-only via `sql.js`. Remaining: Files tab +
+export, the Eval Set tab, and Dashboard sub-tabs 2–4.
+
+---
+
 ## 14. Troubleshooting
 
 ### Environment issues

@@ -8,6 +8,13 @@ const api = {
     recentRuns: (limit?: number) => ipcRenderer.invoke('db:recentRuns', limit),
     lastRun: () => ipcRenderer.invoke('db:lastRun'),
     reload: () => ipcRenderer.invoke('db:reload'),
+    dashboardKpis: () => ipcRenderer.invoke('db:dashboardKpis'),
+    questionsPerGeneration: (limit?: number) =>
+      ipcRenderer.invoke('db:questionsPerGeneration', limit),
+    typeDistribution: () => ipcRenderer.invoke('db:typeDistribution'),
+    difficultyDistribution: () =>
+      ipcRenderer.invoke('db:difficultyDistribution'),
+    costPerRun: (limit?: number) => ipcRenderer.invoke('db:costPerRun', limit),
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),

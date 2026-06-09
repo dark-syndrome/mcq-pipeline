@@ -124,6 +124,39 @@ export interface RowCounts {
   concept_maps: number
 }
 
+// --- Dashboard aggregates (§4.1 KPI strip + §4.2 Overview charts) ---
+export interface DashboardKpis {
+  totalQuestions: number
+  accepted: number
+  rejected: number
+  acceptanceRate: number // 0–1
+  rejectionRate: number // 0–1
+  salvageRate: number | null // null = not persisted in DB
+  totalCost: number
+  avgCostPerQuestion: number
+}
+export interface GenerationBar {
+  generation_number: number
+  run_id: string
+  timestamp: string
+  accepted: number
+  rejected: number
+}
+export interface TypeSlice {
+  type: QuestionType | string
+  count: number
+}
+export interface DifficultySlice {
+  difficulty: Difficulty | string
+  count: number
+}
+export interface CostPoint {
+  generation_number: number
+  run_id: string
+  timestamp: string
+  cost_usd: number
+}
+
 // --- Full resolved Settings (mcq-agent config-dump) for the Model tab ---
 interface PriceBlock {
   input_per_million_tokens: number
