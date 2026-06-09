@@ -45,6 +45,17 @@ temperature: 0.7
 critic_temperature: 0.2
 analyzer_temperature: 0.2
 
+# ---- Per-Bloom-level generation temperature (Model tab §3.4) -----
+# Controls how creatively the Generator approaches each cognitive level.
+# (Schema in place for the Model tab; not yet consumed by the Generator.)
+bloom_temperatures:
+  remember: 0.5
+  understand: 0.6
+  apply: 0.7
+  analyze: 0.7
+  evaluate: 0.8
+  create: 0.9
+
 # ---- Per-stage token budgets ------------------------------------
 # Generator: 150 questions × 2.0 factor = 300 candidates per full pass.
 # Each batch generates ~30-40 questions. Budget must cover that output.
@@ -101,4 +112,4 @@ log_db_path: logs/runs.db
 
 # ---- Paths ------------------------------------------------------
 prompts_dir: prompts
-few_shot_examples_file: prompts/few_shot_examples.json
+few_shot_examples_file: prompts/few_shot_examples.json3

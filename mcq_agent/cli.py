@@ -374,6 +374,29 @@ def lint(
         raise typer.Exit(code=1)
 
 
+@app.command(name="config-dump")
+def config_dump(
+    config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
+    defaults: Annotated[bool, typer.Option(
+        "--defaults", help="Dump pipeline defaults instead of the file's values."
+    )] = False,
+) -> None:
+    """
+    Print the fully-resolved Settings as JSON (for the GUI Model tab).
+
+    With --defaults, dumps the pipeline's built-in defaults (used by the Model
+    tab's "Reset to Defaults") rather than the values in config.yaml.
+    """
+    try:
+        settings = Settings() if defaults else load_config(config)
+        sys.stdout.write(json.dumps(settings.model_dump(mode="json")))
+        sys.stdout.flush()
+    except Exception as exc:
+        sys.stdout.write(json.dumps({"error": str(exc)}))
+        sys.stdout.flush()
+        raise typer.Exit(code=1)
+
+
 @app.command(name="list-runs")
 def list_runs(
     limit: Annotated[int, typer.Option("--limit", "-n")] = 10,

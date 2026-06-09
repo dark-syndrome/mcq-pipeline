@@ -44,6 +44,21 @@ class Pricing(BaseModel):
     output_per_million_tokens: float = 0.79
 
 
+class BloomTemperatures(BaseModel):
+    """Per-Bloom-level generation temperature (GUI spec §3.4 / Open Item #5).
+
+    Defines the schema the Model tab binds to. Defaults follow the spec matrix
+    (lower = more constrained recall, higher = more creative synthesis).
+    """
+    model_config = ConfigDict(extra="forbid")
+    remember: float = Field(default=0.5, ge=0.0, le=1.0)
+    understand: float = Field(default=0.6, ge=0.0, le=1.0)
+    apply: float = Field(default=0.7, ge=0.0, le=1.0)
+    analyze: float = Field(default=0.7, ge=0.0, le=1.0)
+    evaluate: float = Field(default=0.8, ge=0.0, le=1.0)
+    create: float = Field(default=0.9, ge=0.0, le=1.0)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="forbid")
 
@@ -78,6 +93,10 @@ class Settings(BaseSettings):
     temperature: float = Field(default=0.7, ge=0.0, le=1.0)
     critic_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     analyzer_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
+
+    # Per-Bloom-level generation temperature (Model tab §3.4). Schema only for
+    # now — not yet consumed by the Generator (tracked in BUILD_CHECKLIST).
+    bloom_temperatures: BloomTemperatures = Field(default_factory=BloomTemperatures)
 
     # -- Token budgets --------------------------------------------------------
     max_tokens: int = Field(default=16000, ge=1)
