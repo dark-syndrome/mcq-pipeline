@@ -18,6 +18,16 @@ export function readConfig() {
     },
     supabaseEnabled: !!c.enable_supabase,
     dbPath: c.log_db_path ?? 'logs/runs.db',
+    pricing: {
+      input:
+        c.generator_pricing?.input_per_million_tokens ??
+        c.pricing?.input_per_million_tokens ??
+        0.15,
+      output:
+        c.generator_pricing?.output_per_million_tokens ??
+        c.pricing?.output_per_million_tokens ??
+        0.6,
+    },
     defaults: {
       num_questions: c.num_questions ?? 10,
       difficulty: c.difficulty ?? 'medium',

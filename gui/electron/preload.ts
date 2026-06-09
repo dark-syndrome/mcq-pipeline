@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Typed bridge exposed to the renderer as window.api. The renderer-side types
 // live in src/api.d.ts (kept in sync with this surface).
@@ -12,6 +12,14 @@ const api = {
   config: {
     get: () => ipcRenderer.invoke('config:get'),
   },
+  lint: {
+    run: (input: string) => ipcRenderer.invoke('lint:run', input),
+  },
+  dialog: {
+    openMarkdown: () => ipcRenderer.invoke('dialog:openMarkdown'),
+  },
+  // Electron 33 removed File.path; resolve a dropped/selected file's absolute path.
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   run: {
     isRunning: () => ipcRenderer.invoke('run:isRunning'),
     start: (params: unknown) => ipcRenderer.invoke('run:start', params),

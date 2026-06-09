@@ -34,7 +34,7 @@ The Electron app lives in **`gui/`** (separate from the Python package). Run it 
 | 0 | Spec→repo, checklist, memory, reconcile §8.2 event schema | 8.2, 9.1 | — | `[x]` |
 | 1 | Electron+Vite+React+Tailwind scaffold; nav rail + status bar shell; Zustand store; theme tokens; home banner; 5 placeholder tabs | 2, 8.1, 8.3, 10 | 0 | `[x]` |
 | 2 | IPC layer: sidecar spawn/stream + DB queries (sql.js); status bar + home banner wired to live data | 8.1, 8.2 | 1 | `[x]` |
-| 3 | Run tab Phase 1+2 (upload, Layer-1 linter card, run config) | 6.1 | 2 | `[ ]` |
+| 3 | Run tab Phase 1+2 (upload, Layer-1 linter card, run config, pre-flight estimate) | 6.1 | 2 | `[x]` |
 | 4 | Run tab Phase 3 (live stage timeline + accepted feed + completion card) | 6.1, 10.2 | 3 | `[ ]` |
 | 5 | Model tab (6 config sections, profile save/load) — needs Bloom config schema first | 3 | 2 | `[ ]` |
 | 6 | Dashboard KPI strip + Overview sub-tab (4 charts) | 4.1, 4.2 | 2 | `[ ]` |
@@ -59,6 +59,7 @@ The Electron app lives in **`gui/`** (separate from the Python package). Run it 
 | Per-Bloom-level temperature config schema | Open #5 (P2) | `[ ]` | **Blocks Model tab §3.4.** `config.yaml` has single `temperature` + per-stage temps only |
 | venv Python path resolution for Electron sidecar | Open #2 (P0) | `[x]` | `gui/electron/paths.ts` resolvePython(): `MCQ_PYTHON` env → `.venv`/`venv` → PATH. Conda users launch from an activated env or set `MCQ_PYTHON` |
 | `python -m mcq_agent.cli` entry (`__main__` guard) | — | `[x]` | Added so the sidecar invokes the module directly |
+| `lint` CLI command (`--json`) — Layer-1 only, no API calls | §6.1 | `[x]` | Reuses parser + run_static_linter; powers the Run-tab Source Quality card via `lint:run` IPC |
 | Supabase service_role key access from Electron | Open #4 (P1) | `[ ]` | Electron-side; resolve in Session 8 |
 | DOCX export field schema decision | Open #3 (P1) | `[ ]` | Content team; blocks Session 8 |
 

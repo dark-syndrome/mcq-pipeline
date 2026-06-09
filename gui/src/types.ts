@@ -124,12 +124,31 @@ export interface RowCounts {
   concept_maps: number
 }
 
+// --- Layer-1 source linter report (mcq-agent lint --json) ---
+export type LintStatus = 'PASS' | 'WARN' | 'FAIL'
+export interface LintCheck {
+  name: string
+  status: LintStatus
+  message: string
+  value: number | string | null
+  threshold: number | string | null
+}
+export interface LintReport {
+  source_file: string
+  run_id: string
+  overall_status: LintStatus
+  concept_density_score: number | null
+  recommendation: string
+  checks: LintCheck[]
+}
+
 // --- config.yaml projection used by the status bar + Run-tab defaults ---
 export interface AppConfig {
   provider: string
   modelRoute: { analyzer: string; generator: string; critic: string }
   supabaseEnabled: boolean
   dbPath: string
+  pricing: { input: number; output: number }
   defaults: {
     num_questions: number
     difficulty: Difficulty

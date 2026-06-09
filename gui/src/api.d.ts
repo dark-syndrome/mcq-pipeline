@@ -1,4 +1,11 @@
-import type { AppConfig, PipelineEvent, ProcessExitEvent, RowCounts, RunRow } from './types'
+import type {
+  AppConfig,
+  LintReport,
+  PipelineEvent,
+  ProcessExitEvent,
+  RowCounts,
+  RunRow,
+} from './types'
 
 export interface RunStartParams {
   input: string
@@ -20,6 +27,13 @@ export interface Api {
   config: {
     get: () => Promise<AppConfig | null>
   }
+  lint: {
+    run: (input: string) => Promise<LintReport>
+  }
+  dialog: {
+    openMarkdown: () => Promise<string | null>
+  }
+  getPathForFile: (file: File) => string
   run: {
     isRunning: () => Promise<boolean>
     start: (params: RunStartParams) => Promise<void>
