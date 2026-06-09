@@ -101,7 +101,13 @@ export type PipelineEvent =
   | RunCompleteEvent
   | ErrorEvent
 
-// --- DB row shapes (read from logs/runs.db; refined in Session 2) ---
+// Emitted by the sidecar wrapper (not the pipeline) when the child exits.
+export interface ProcessExitEvent {
+  event: 'process_exit'
+  code: number | null
+}
+
+// --- DB row shapes (read from logs/runs.db; columns match the runs table) ---
 export interface RunRow {
   run_id: string
   generation_number: number
@@ -109,8 +115,28 @@ export interface RunRow {
   input_file: string
   generated_count: number
   passed_count: number
-  rejected_count: number
   cost_usd: number
+}
+
+export interface RowCounts {
+  runs: number
+  mcqs: number
+  concept_maps: number
+}
+
+// --- config.yaml projection used by the status bar + Run-tab defaults ---
+export interface AppConfig {
+  provider: string
+  modelRoute: { analyzer: string; generator: string; critic: string }
+  supabaseEnabled: boolean
+  dbPath: string
+  defaults: {
+    num_questions: number
+    difficulty: Difficulty
+    question_type: string
+    num_options: number
+    over_generation_factor: number
+  }
 }
 
 // --- Persistent status bar (§2.2) ---

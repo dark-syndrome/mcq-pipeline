@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
+import { registerIpc } from './ipc'
 
 // Window chrome only. IPC (Python sidecar + better-sqlite3) is added in Session 2.
 function createWindow() {
@@ -27,6 +28,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerIpc()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

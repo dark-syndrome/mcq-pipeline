@@ -12,6 +12,7 @@ const CARDS: { id: TabId; title: string; desc: string; Icon: LucideIcon }[] = [
 // Landing banner (§2.3) shown when no tab is selected.
 export default function HomeBanner() {
   const setActiveTab = useStore((s) => s.setActiveTab)
+  const lastRun = useStore((s) => s.lastRun)
 
   return (
     <div className="mx-auto max-w-5xl px-10 py-12">
@@ -44,9 +45,29 @@ export default function HomeBanner() {
 
       <div className="mt-10 rounded-xl border border-border bg-surface p-5">
         <p className="text-sm font-medium text-text">Last run</p>
-        <p className="mt-1 text-sm text-muted">
-          No runs loaded yet — wired to the most recent PipelineRun in SQLite in Session 2.
-        </p>
+        {lastRun ? (
+          <div className="mt-3 flex flex-wrap gap-x-10 gap-y-2 text-sm">
+            <span>
+              <span className="text-muted">Generated</span>{' '}
+              <span className="font-medium">{lastRun.generated_count}</span>
+            </span>
+            <span>
+              <span className="text-muted">Accepted</span>{' '}
+              <span className="font-medium text-success">{lastRun.passed_count}</span>
+            </span>
+            <span>
+              <span className="text-muted">Cost</span>{' '}
+              <span className="font-medium">${Number(lastRun.cost_usd).toFixed(3)}</span>
+            </span>
+            <span>
+              <span className="text-muted">When</span>{' '}
+              <span className="font-medium">{String(lastRun.timestamp).slice(0, 19)}</span>
+            </span>
+            <span className="text-muted">{String(lastRun.input_file)}</span>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-muted">No runs recorded yet.</p>
+        )}
       </div>
     </div>
   )

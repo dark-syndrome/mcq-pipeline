@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { StatusInfo, TabId } from './types'
+import type { RunRow, StatusInfo, TabId } from './types'
 
 interface AppState {
   // null activeTab = homepage banner (§2.3)
@@ -9,6 +9,11 @@ interface AppState {
   status: StatusInfo
   setStatus: (patch: Partial<StatusInfo>) => void
   addSessionCost: (usd: number) => void
+
+  lastRun: RunRow | null
+
+  // Load config + DB snapshot into the store (status bar, home banner).
+  hydrate: () => Promise<void>
 }
 
 const initialStatus: StatusInfo = {
@@ -31,4 +36,27 @@ export const useStore = create<AppState>((set) => ({
     set((s) => ({
       status: { ...s.status, sessionCost: s.status.sessionCost + usd },
     })),
+
+  lastRun: null,
+
+  hydrate: async () => {
+    if (!window.api) return
+    const [config, counts, lastRun] = await Promise.all([
+      window.api.config.get(),
+      window.api.db.rowCounts(),
+      window.api.db.lastRun(),
+    ])
+    set((s) => ({
+      status: {
+        ...s.status,
+        provider: config?.provider ?? s.status.provider,
+        connected: !!config,
+        modelRoute: config?.modelRoute ?? s.status.modelRoute,
+        supabaseEnabled: config?.supabaseEnabled ?? false,
+        dbPath: config?.dbPath ?? s.status.dbPath,
+        dbRows: counts?.mcqs ?? null,
+      },
+      lastRun,
+    }))
+  },
 }))

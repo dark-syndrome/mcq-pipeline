@@ -16,11 +16,14 @@ Status keys: `[ ]` not started · `[~]` in progress · `[x]` done
 
 The Electron app lives in **`gui/`** (separate from the Python package). Run it with `cd gui && npm run dev`; build with `npm run build`.
 
+### Stack deviations from the spec (with rationale)
+- **DB access uses `sql.js` (WASM), not `better-sqlite3`** (spec §8.1). This machine has no C++ toolchain (no VS Build Tools / `cl.exe`), so `better-sqlite3`'s native rebuild against Electron's ABI can't compile. GUI DB access is read-only (the Python pipeline owns all writes), so an in-memory WASM snapshot is sufficient. `gui/electron/db.ts` caches the snapshot and exposes `reload()` to re-read after a run. Reversible: swap to `better-sqlite3` if a C++ toolchain is installed and interactive perf on a large DB ever demands native bindings.
+
 ## Frozen contracts (read these in every tab session)
 | Contract | Location | Status |
 |---|---|---|
 | IPC event protocol (Python→JS NDJSON) | `mcq_agent/cli.py` header + `GUI_SPEC.md` §8.2; mirrored in `gui/src/types.ts` | `[x]` frozen |
-| IPC API surface (main↔renderer) | `gui/electron/preload.ts` stub → real in Session 2 | `[~]` stub only |
+| IPC API surface (main↔renderer) | `gui/electron/preload.ts` + `gui/electron/ipc.ts`; renderer types in `gui/src/api.d.ts` | `[x]` frozen |
 | Shared TS types + Tailwind theme tokens | `gui/src/types.ts`, `gui/tailwind.config.js` | `[x]` frozen |
 
 ---
@@ -30,7 +33,7 @@ The Electron app lives in **`gui/`** (separate from the Python package). Run it 
 |---|---|---|---|---|
 | 0 | Spec→repo, checklist, memory, reconcile §8.2 event schema | 8.2, 9.1 | — | `[x]` |
 | 1 | Electron+Vite+React+Tailwind scaffold; nav rail + status bar shell; Zustand store; theme tokens; home banner; 5 placeholder tabs | 2, 8.1, 8.3, 10 | 0 | `[x]` |
-| 2 | IPC layer: sidecar spawn/stream + better-sqlite3 query stubs | 8.1, 8.2 | 1 | `[ ]` |
+| 2 | IPC layer: sidecar spawn/stream + DB queries (sql.js); status bar + home banner wired to live data | 8.1, 8.2 | 1 | `[x]` |
 | 3 | Run tab Phase 1+2 (upload, Layer-1 linter card, run config) | 6.1 | 2 | `[ ]` |
 | 4 | Run tab Phase 3 (live stage timeline + accepted feed + completion card) | 6.1, 10.2 | 3 | `[ ]` |
 | 5 | Model tab (6 config sections, profile save/load) — needs Bloom config schema first | 3 | 2 | `[ ]` |
@@ -54,7 +57,8 @@ The Electron app lives in **`gui/`** (separate from the Python package). Run it 
 | `question_rejected` event | §8.2 | `[ ]` | **GAP** — spec defines it; not emitted. Add when Run-tab rejection feed needs it |
 | Per-stage cost for `generate`/`critic` on `stage_done` | §8.2 | `[ ]` | Currently only aggregate in `run_complete.cost_breakdown` (generate is a retry loop) |
 | Per-Bloom-level temperature config schema | Open #5 (P2) | `[ ]` | **Blocks Model tab §3.4.** `config.yaml` has single `temperature` + per-stage temps only |
-| venv Python path resolution for Electron sidecar | Open #2 (P0) | `[ ]` | Electron-side; resolve in Session 2 |
+| venv Python path resolution for Electron sidecar | Open #2 (P0) | `[x]` | `gui/electron/paths.ts` resolvePython(): `MCQ_PYTHON` env → `.venv`/`venv` → PATH. Conda users launch from an activated env or set `MCQ_PYTHON` |
+| `python -m mcq_agent.cli` entry (`__main__` guard) | — | `[x]` | Added so the sidecar invokes the module directly |
 | Supabase service_role key access from Electron | Open #4 (P1) | `[ ]` | Electron-side; resolve in Session 8 |
 | DOCX export field schema decision | Open #3 (P1) | `[ ]` | Content team; blocks Session 8 |
 

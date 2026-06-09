@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import { useEffect, type FC } from 'react'
 import NavRail from './components/NavRail'
 import StatusBar from './components/StatusBar'
 import HomeBanner from './components/HomeBanner'
@@ -20,7 +20,12 @@ const TABS: Record<TabId, FC> = {
 
 export default function App() {
   const activeTab = useStore((s) => s.activeTab)
+  const hydrate = useStore((s) => s.hydrate)
   const ActiveComponent: FC = activeTab ? TABS[activeTab] : HomeBanner
+
+  useEffect(() => {
+    void hydrate()
+  }, [hydrate])
 
   return (
     <div className="flex h-full w-full flex-col bg-bg text-text">

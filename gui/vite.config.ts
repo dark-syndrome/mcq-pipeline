@@ -8,7 +8,12 @@ export default defineConfig({
   plugins: [
     react(),
     electron({
-      main: { entry: 'electron/main.ts' },
+      main: {
+        entry: 'electron/main.ts',
+        // sql.js + yaml stay external so they load from node_modules at runtime
+        // (sql.js needs its .wasm resolved via require.resolve).
+        vite: { build: { rollupOptions: { external: ['sql.js', 'yaml'] } } },
+      },
       preload: { input: 'electron/preload.ts' },
       renderer: {},
     }),
