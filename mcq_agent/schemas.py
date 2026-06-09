@@ -265,6 +265,30 @@ class MCQ(BaseModel):
     question_number: int | None = None
     generation_number: int | None = None
 
+    @field_validator("bloom_level", mode="before")
+    @classmethod
+    def _coerce_stem_pattern_into_bloom(cls, v):
+        """
+        Models frequently leak the ``stem_pattern`` value (e.g. "debugging")
+        into the ``bloom_level`` field, since both describe the question. Map
+        those known stem-pattern names onto their cognitive Bloom level rather
+        than rejecting the whole batch. The mapping mirrors the few-shot data,
+        where debugging questions are tagged at the "analyze" level.
+        """
+        if isinstance(v, str):
+            stem_to_bloom = {
+                "debugging": BloomLevel.ANALYZE,
+                "comparison": BloomLevel.ANALYZE,
+                "scenario": BloomLevel.APPLY,
+                "procedure": BloomLevel.APPLY,
+                "definition": BloomLevel.REMEMBER,
+            }
+            normalized = v.strip().lower()
+            valid = {level.value for level in BloomLevel}
+            if normalized not in valid and normalized in stem_to_bloom:
+                return stem_to_bloom[normalized]
+        return v
+
     @field_validator("options")
     @classmethod
     def validate_options(cls, v: list[Option]) -> list[Option]:

@@ -191,7 +191,9 @@ For each question, return a complete MCQ object including:
 - An explanation of why the correct answer is correct
 - The exact source excerpt that supports the answer (verbatim from source)
 - The source heading where the excerpt is found
-- The Bloom's level
+- bloom_level: one of remember | understand | apply | analyze | evaluate | create
+  (This is the cognitive level ONLY. "debugging" is a stem_pattern, NOT a bloom_level —
+  a debugging question is usually bloom_level "analyze".)
 - The difficulty level
 - stem_pattern: one of definition | scenario | debugging | comparison | procedure
 

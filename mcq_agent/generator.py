@@ -37,6 +37,26 @@ class MCQList(BaseModel):
     mcqs: list[MCQ]
 
 
+def _filter_few_shot_examples(
+    examples: list[dict],
+    concept_map: ConceptMap,
+    concept_slice: list | None = None,
+) -> list[dict]:
+    """Return examples matching the exact Bloom/stem pairs requested."""
+    concepts = concept_slice if concept_slice is not None else concept_map.concepts
+    target_pairs = {
+        (template.bloom_level.value, template.stem_pattern.value)
+        for concept in concepts
+        for template in concept.question_templates
+    }
+
+    return [
+        example
+        for example in examples
+        if (example.get("bloom_level"), example.get("stem_pattern")) in target_pairs
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Concept map → compact text  (injected into Generator prompt)
 # ---------------------------------------------------------------------------
@@ -209,7 +229,17 @@ def generate_mcqs(
     if few_shot_path.exists():
         with few_shot_path.open(encoding="utf-8") as fh:
             few_shot_data = json.load(fh)
-        few_shot_str = json.dumps(few_shot_data, indent=2)
+        filtered_few_shot_data = _filter_few_shot_examples(
+            few_shot_data,
+            concept_map,
+            concept_slice=concept_slice,
+        )
+        few_shot_str = json.dumps(filtered_few_shot_data, indent=2)
+        log.info(
+            "generator_few_shot_filter",
+            pool_size=len(few_shot_data),
+            selected_size=len(filtered_few_shot_data),
+        )
     else:
         few_shot_str = "[]"
 

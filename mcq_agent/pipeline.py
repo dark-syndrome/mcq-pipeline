@@ -53,7 +53,7 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 _REGEN_PROMPT = """\
-The following MCQ was rejected by the quality critic. Please generate ONE
+The following MCQ was rejected by the quality critic. Generate ONE
 replacement question on the same topic that addresses the critique feedback.
 
 <original_mcq>
@@ -182,7 +182,9 @@ def _process_batch(
 
         if critique.passes:
             final_mcqs.append(mcq)
-            log.info("pipeline_mcq_accepted", total_accepted=len(final_mcqs))
+            log.info("pipeline_mcq_accepted", total_accepted=len(final_mcqs),
+                     stem=mcq.question[:100], difficulty=mcq.difficulty.value,
+                     bloom_level=mcq.bloom_level.value)
             continue
 
         if config.max_regeneration_attempts > 0:
@@ -203,7 +205,9 @@ def _process_batch(
                     critic_usages.append(re_crit_usage)
                     if re_critique.passes:
                         final_mcqs.append(new_mcq)
-                        log.info("pipeline_regen_accepted", total_accepted=len(final_mcqs))
+                        log.info("pipeline_regen_accepted", total_accepted=len(final_mcqs),
+                                 stem=new_mcq.question[:100], difficulty=new_mcq.difficulty.value,
+                                 bloom_level=new_mcq.bloom_level.value)
                         continue
                     rejected_mcqs.append((new_mcq, re_critique))
                     continue
@@ -532,10 +536,17 @@ def run_pipeline(
         db_path=db_path,
     )
     analyzer_usages.append(analyze_usage)
+    _analyze_cost = (
+        (analyze_usage.input_tokens / 1_000_000) * settings.pricing.input_per_million_tokens
+        + (analyze_usage.output_tokens / 1_000_000) * settings.pricing.output_per_million_tokens
+    )
     log.info(
         "pipeline_analyze_done",
         concepts=len(concept_map.concepts),
-        cached=(analyze_usage.model == "cache"),
+        cache_hit=(analyze_usage.model == "cache"),
+        tokens_in=analyze_usage.input_tokens,
+        tokens_out=analyze_usage.output_tokens,
+        cost=round(_analyze_cost, 6),
     )
 
     # ------------------------------------------------------------------
@@ -582,7 +593,8 @@ def run_pipeline(
         gen_usages.append(gen_usage)
         batch_count = len(candidates)
         total_generated += batch_count
-        log.info("pipeline_generate_done", generated=batch_count)
+        log.info("pipeline_generate_done", generated=batch_count,
+                 tokens_in=gen_usage.input_tokens, tokens_out=gen_usage.output_tokens)
 
         all_failed = _process_batch(
             candidates=candidates,
@@ -665,6 +677,9 @@ def run_pipeline(
                 "stem_pattern": mcq.stem_pattern.value,
                 "bloom_level": mcq.bloom_level.value,
             })
+            # Surface each salvaged question to the live feed (GUI --json-events).
+            log.info("pipeline_salvaged_accepted", stem=mcq.question[:100],
+                     difficulty=mcq.difficulty.value, bloom_level=mcq.bloom_level.value)
         log.info(
             "pipeline_reframe_done",
             salvaged=len(salvaged),

@@ -9,6 +9,7 @@ Changes:
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -53,6 +54,109 @@ def _configure_logging(verbose: bool) -> None:
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(level))
 
 
+# ---------------------------------------------------------------------------
+# GUI integration — newline-delimited JSON event stream (--json-events)
+# ---------------------------------------------------------------------------
+#
+# When `--json-events` is passed, the command emits machine-readable NDJSON to
+# stdout instead of pretty Rich output, so an Electron/React frontend can drive
+# a live pipeline-stage timeline. The schema is documented in the GUI spec §8.2.
+# Internal structlog events are translated to the GUI protocol below; everything
+# else is dropped so stdout carries ONLY protocol events (one JSON object/line).
+#
+# CANONICAL EVENT CONTRACT (frozen — keep in sync with docs/GUI_SPEC.md §8.2):
+#   run_start         {event, run_id}
+#   stage_start       {event, stage, [attempt, need, have]}
+#   stage_done        {event, stage, [tokens_in, tokens_out, cost, cache_hit],
+#                      <detail: chars|sections|concepts|status|salvaged|still_rejected>}
+#   stage_progress    {event, stage:"generate", generated, tokens_in, tokens_out}
+#   question_accepted {event, total_accepted, stem, difficulty, bloom_level, salvaged}
+#   run_complete      {event, run_id, run_label, generated, accepted, salvaged,
+#                      rejected, requested, cost_usd, cost_breakdown{...}, output_files{...}}
+#   error             {event, stage, message, retryable}
+# stage ids: parse | linter_l1 | analyze | linter_l2 | generate | reframe
+#
+# KNOWN GAP (tracked in docs/BUILD_CHECKLIST.md): the spec's `question_rejected`
+# event is not yet emitted, and `generate`/`critic` per-stage cost is only
+# reported in aggregate via run_complete.cost_breakdown (not per stage_done).
+
+# internal structlog event  →  GUI "stage_done" stage id
+_STAGE_DONE_MAP = {
+    "pipeline_parse_done": "parse",
+    "pipeline_linter_done": "linter_l1",
+    "pipeline_analyze_done": "analyze",
+    "pipeline_density_check_done": "linter_l2",
+    "pipeline_reframe_done": "reframe",
+}
+# internal structlog event  →  GUI "stage_start" stage id
+_STAGE_START_MAP = {
+    "pipeline_generate_attempt": "generate",
+    "pipeline_reframe_start": "reframe",
+}
+_ACCEPTED_EVENTS = {
+    "pipeline_mcq_accepted",
+    "pipeline_regen_accepted",
+    "pipeline_salvaged_accepted",
+}
+
+
+def _emit(event: dict) -> None:
+    """Write a single GUI protocol event as one line of JSON to stdout."""
+    sys.stdout.write(json.dumps(event) + "\n")
+    sys.stdout.flush()
+
+
+def _json_event_processor(logger, method_name, event_dict):
+    """structlog processor: translate internal events to the GUI protocol."""
+    name = event_dict.get("event", "")
+
+    if name == "pipeline_start":
+        _emit({"event": "run_start", "run_id": event_dict.get("run_id")})
+    elif name in _STAGE_START_MAP:
+        payload = {"event": "stage_start", "stage": _STAGE_START_MAP[name]}
+        for k in ("attempt", "need", "have"):
+            if k in event_dict:
+                payload[k] = event_dict[k]
+        _emit(payload)
+    elif name in _STAGE_DONE_MAP:
+        payload = {"event": "stage_done", "stage": _STAGE_DONE_MAP[name]}
+        # Per-stage cost transparency (GUI spec §8.2): tokens_in/tokens_out/cost/
+        # cache_hit are present on API stages (analyze); omitted on zero-token
+        # stages (parse, linter). Remaining keys are stage-specific detail.
+        for k in ("tokens_in", "tokens_out", "cost", "cache_hit",
+                  "chars", "sections", "concepts", "status",
+                  "salvaged", "still_rejected"):
+            if k in event_dict:
+                payload[k] = event_dict[k]
+        _emit(payload)
+    elif name == "pipeline_generate_done":
+        _emit({"event": "stage_progress", "stage": "generate",
+               "generated": event_dict.get("generated"),
+               "tokens_in": event_dict.get("tokens_in"),
+               "tokens_out": event_dict.get("tokens_out")})
+    elif name in _ACCEPTED_EVENTS:
+        _emit({
+            "event": "question_accepted",
+            "total_accepted": event_dict.get("total_accepted"),
+            "stem": event_dict.get("stem"),
+            "difficulty": event_dict.get("difficulty"),
+            "bloom_level": event_dict.get("bloom_level"),
+            "salvaged": name == "pipeline_salvaged_accepted",
+        })
+
+    raise structlog.DropEvent  # nothing reaches stdout except our emitted events
+
+
+def _configure_json_logging() -> None:
+    import logging
+    # Route library/stdlib logs to stderr so stdout stays pure NDJSON.
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
+    structlog.configure(
+        processors=[_json_event_processor],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+    )
+
+
 @app.command()
 def generate(
     input: Annotated[Path, typer.Option("--input", "-i", help="Path to source .md file")],
@@ -69,6 +173,11 @@ def generate(
     )] = None,
     config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+    json_events: Annotated[bool, typer.Option(
+        "--json-events",
+        help="Emit newline-delimited JSON pipeline events to stdout (for the GUI "
+             "sidecar) instead of human-readable Rich output.",
+    )] = False,
 ) -> None:
     """
     Run the full MCQ generation pipeline.
@@ -78,7 +187,10 @@ def generate(
       <run_id>_rejected.json       — rejected questions with critique
       <run_id>_source_quality.json — linter + concept-density report
     """
-    _configure_logging(verbose)
+    if json_events:
+        _configure_json_logging()
+    else:
+        _configure_logging(verbose)
     try:
         settings: Settings = load_config(config)
 
@@ -104,26 +216,27 @@ def generate(
         db_path = Path(settings.log_db_path)
         storage.init_db(db_path)
 
-        # Show stage routing
-        console.print("\n[bold]MCQ Pipeline — Stage Configuration[/bold]")
-        console.print(
-            f"  Analyzer  : [cyan]{settings.resolved_analyzer_provider().value}[/cyan] / "
-            f"[cyan]{settings.resolved_analyzer_model()}[/cyan]  "
-            f"[dim](premium — cached after first run)[/dim]"
-        )
-        console.print(
-            f"  Generator : [cyan]{settings.resolved_generator_provider().value}[/cyan] / "
-            f"[cyan]{settings.resolved_generator_model()}[/cyan]"
-        )
-        console.print(
-            f"  Critic    : [cyan]{settings.resolved_critic_provider().value}[/cyan] / "
-            f"[cyan]{settings.resolved_critic_model()}[/cyan]"
-        )
-        console.print(
-            f"  Input     : {input}\n"
-            f"  Topic     : [cyan]{topic}[/cyan]\n"
-            f"  Target    : [cyan]{mcq_config.num_questions}[/cyan] accepted questions\n"
-        )
+        # Show stage routing (suppressed in JSON-events mode — stdout is NDJSON)
+        if not json_events:
+            console.print("\n[bold]MCQ Pipeline — Stage Configuration[/bold]")
+            console.print(
+                f"  Analyzer  : [cyan]{settings.resolved_analyzer_provider().value}[/cyan] / "
+                f"[cyan]{settings.resolved_analyzer_model()}[/cyan]  "
+                f"[dim](premium — cached after first run)[/dim]"
+            )
+            console.print(
+                f"  Generator : [cyan]{settings.resolved_generator_provider().value}[/cyan] / "
+                f"[cyan]{settings.resolved_generator_model()}[/cyan]"
+            )
+            console.print(
+                f"  Critic    : [cyan]{settings.resolved_critic_provider().value}[/cyan] / "
+                f"[cyan]{settings.resolved_critic_model()}[/cyan]"
+            )
+            console.print(
+                f"  Input     : {input}\n"
+                f"  Topic     : [cyan]{topic}[/cyan]\n"
+                f"  Target    : [cyan]{mcq_config.num_questions}[/cyan] accepted questions\n"
+            )
 
         run = pipeline_mod.run_pipeline(
             input_file=input,
@@ -145,6 +258,32 @@ def generate(
         rejected_file  = output_dir / f"{run_label}_rejected.json"
         quality_file   = output_dir / f"{run_label}_source_quality.json"
         config_file    = output_dir / f"{run_label}_run_config.json"
+
+        if json_events:
+            _emit({
+                "event": "run_complete",
+                "run_id": run.run_id,
+                "run_label": run_label,
+                "generated": run.generated_count,
+                "accepted": run.passed_count,
+                "salvaged": run.salvaged_count,
+                "rejected": len(run.rejected_mcqs),
+                "requested": mcq_config.num_questions,
+                "cost_usd": round(run.total_cost_usd, 6),
+                "cost_breakdown": {
+                    "analyzer": round(run.analyzer_cost_usd, 6),
+                    "generator": round(run.generator_cost_usd, 6),
+                    "critic": round(run.critic_cost_usd, 6),
+                    "reframer": round(run.reframe_cost_usd, 6),
+                },
+                "output_files": {
+                    "accepted": str(accepted_file),
+                    "rejected": str(rejected_file),
+                    "quality": str(quality_file),
+                    "run_config": str(config_file),
+                },
+            })
+            return
 
         console.print(f"[green]Done.[/green]  Run ID: [bold]{run.run_id}[/bold]\n")
         console.print(
@@ -178,6 +317,10 @@ def generate(
             )
 
     except Exception as exc:
+        if json_events:
+            _emit({"event": "error", "stage": "pipeline",
+                   "message": str(exc), "retryable": False})
+            raise typer.Exit(code=1)
         err_console.print(f"\n[bold red]Error:[/bold red] {exc}")
         err_console.print(
             "[dim]Token usage and estimated cost for this failed/partial run "
