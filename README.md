@@ -356,9 +356,20 @@ critic_max_tokens: 4000        # Critic output budget (per MCQ evaluation)
 analyzer_max_tokens: 20000     # Analyzer output budget
 
 # ── LLM Temperatures ──────────────────────────────────────────────────────
-temperature: 0.7               # Generator — creative, diverse MCQs
+temperature: 0.7               # Generator — fallback when no Bloom level applies
 critic_temperature: 0.2        # Critic — strict, deterministic evaluation
 analyzer_temperature: 0.2      # Analyzer — deterministic concept extraction
+
+# Per-Bloom-level generation temperature. The Generator makes one call per Bloom
+# level the source supports, each at the temperature below (lower = more
+# constrained recall, higher = more creative synthesis). See Stage 2 — Generate.
+bloom_temperatures:
+  remember: 0.5
+  understand: 0.6
+  apply: 0.7
+  analyze: 0.7
+  evaluate: 0.8
+  create: 0.9
 
 # ── Source Linter Thresholds ───────────────────────────────────────────────
 linter_min_words: 300
@@ -521,8 +532,9 @@ Each candidate `MCQ` includes:
 - `bloom_level`, `difficulty`, `question_type`, `stem_pattern`
 
 Key generation behaviours:
+- **Per-Bloom multi-call:** generation fans out across the Bloom levels the source actually supports (the union of every concept's `supported_bloom_levels`). Each level gets its **own** Generator call at its own temperature from `bloom_temperatures` — so a `remember` batch runs at 0.5 (constrained recall) while a `create` batch runs at 0.9 (creative synthesis). The run's question target is split evenly across active levels each retry attempt, with any remainder handed to the levels backed by the most concepts. A source whose concepts declare no Bloom levels falls back to a single flat-temperature call (`temperature`).
 - **Over-generation:** generates `num_questions × over_generation_factor` candidates to account for critic rejections
-- **Mixed types:** with `mixed_question_types: true`, distributes across `single_correct`, `ordering` (step-sequencing), and `code_snippet` types
+- **Mixed types:** with `mixed_question_types: true`, distributes across `single_correct`, `ordering` (step-sequencing), and `code_snippet` types. The `ordering`/`code_snippet` hints are suppressed for `remember`/`understand` batches, where those higher-order formats don't fit.
 - **Batch processing:** chunks large concept maps to stay within token budgets
 - **Position bias fix:** prompted to distribute correct answers across A/B/C/D evenly (a post-generation shuffle in `validators.py` enforces this mechanically)
 
@@ -531,7 +543,7 @@ Key generation behaviours:
 - **Source-phrase independence (#10):** correct answer must paraphrase, not echo, the source excerpt
 - **Option length parity (#11):** correct answer must stay within ±20% of median distractor length; expand distractors rather than trimming the correct answer
 
-**Temperature:** 0.7 — creative, diverse question generation.
+**Temperature:** per Bloom level (see `bloom_temperatures` above); `temperature: 0.7` is the fallback when the source declares no Bloom levels.
 
 ---
 
@@ -1180,8 +1192,12 @@ difficulty distribution), the **Files** tab filter builder + results preview (gr
 over the DB: difficulty/bloom/type/source-file/heading/date filters, ratio picker, fetch modes,
 card & table views), plus **export** (JSON/DOCX/PDF — PDF via Electron's bundled Chromium, DOCX via
 the `docx` package) and a **DB-management panel** (SQLite status, health check, concept-cache clear,
-and Supabase push through the Python dedup gate). All reads use `sql.js` read-only. Remaining: the
-Eval Set tab and Dashboard sub-tabs 2–4.
+and Supabase push through the Python dedup gate). All reads use `sql.js` read-only. The **Dashboard**
+now has all four sub-tabs: Overview (4 charts), Quality (validator failure bar, reframer-class pie,
+critic-criteria heatmap, source-linter stats table), Cost & Tokens (cumulative cost trend with
+regression forecast, cache-hit-rate stat card, token-usage stacked bar, cost-per-question scatter),
+and Run History (sortable/filterable table with per-run Inspect drawer + JSON export). Remaining: the
+Eval Set tab only.
 
 ---
 
