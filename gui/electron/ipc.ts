@@ -11,6 +11,7 @@ import {
   buildDocx,
   buildJson,
   buildPdf,
+  buildXlsx,
   writeFileSync,
   type ExportOptions,
   type ExportRow,
@@ -114,6 +115,8 @@ export function registerIpc(): void {
       writeFileSync(result.filePath, buildJson(rows, opts))
     } else if (opts.format === 'docx') {
       writeFileSync(result.filePath, await buildDocx(rows, opts))
+    } else if (opts.format === 'xlsx') {
+      writeFileSync(result.filePath, buildXlsx(rows, opts))
     } else {
       writeFileSync(result.filePath, await buildPdf(rows, opts))
     }

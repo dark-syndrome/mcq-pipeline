@@ -80,7 +80,12 @@ export default function ExportPanel({ rows }: { rows: McqRow[] }) {
 
       <label className="mt-3 block text-xs font-medium text-muted">Format</label>
       <div className="mt-1 space-y-1">
-        {(['json', 'docx', 'pdf'] as const).map((f) => (
+        {([
+          ['json', 'JSON'],
+          ['xlsx', 'XLSX / Sheets'],
+          ['docx', 'DOCX'],
+          ['pdf', 'PDF'],
+        ] as const).map(([f, label]) => (
           <label key={f} className="flex items-center gap-2 text-xs">
             <input
               type="radio"
@@ -89,7 +94,7 @@ export default function ExportPanel({ rows }: { rows: McqRow[] }) {
               onChange={() => setFormat(f)}
               className="accent-primary"
             />
-            <span className="uppercase">{f}</span>
+            <span>{label}</span>
           </label>
         ))}
       </div>
@@ -104,6 +109,24 @@ export default function ExportPanel({ rows }: { rows: McqRow[] }) {
             />
             <Check
               label="Include distractor rationale"
+              checked={opts.includeRationale}
+              onChange={(v) => set({ includeRationale: v })}
+            />
+          </>
+        ) : format === 'xlsx' ? (
+          <>
+            <Check
+              label="Explanation column"
+              checked={opts.includeExplanation}
+              onChange={(v) => set({ includeExplanation: v })}
+            />
+            <Check
+              label="Bloom / difficulty / type metadata"
+              checked={opts.metadata}
+              onChange={(v) => set({ metadata: v })}
+            />
+            <Check
+              label="Distractor rationale columns"
               checked={opts.includeRationale}
               onChange={(v) => set({ includeRationale: v })}
             />

@@ -300,7 +300,7 @@ export interface QueryResult {
 }
 
 // --- Files export (§5.6) ---
-export type ExportFormat = 'json' | 'docx' | 'pdf'
+export type ExportFormat = 'json' | 'docx' | 'pdf' | 'xlsx'
 export interface ExportOptions {
   format: ExportFormat
   includeExplanation?: boolean

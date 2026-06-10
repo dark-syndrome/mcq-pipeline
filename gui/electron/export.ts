@@ -8,13 +8,14 @@ import {
   Paragraph,
   TextRun,
 } from 'docx'
+import * as XLSX from 'xlsx'
 
-// Export the selected MCQ set to JSON / DOCX / PDF (GUI §5.6). File generation
-// lives here; the save-dialog interaction stays in ipc.ts. Rows are the parsed
-// McqRow objects sent from the renderer (see src/types.ts).
+// Export the selected MCQ set to JSON / DOCX / PDF / XLSX (GUI §5.6). File
+// generation lives here; the save-dialog interaction stays in ipc.ts. Rows are
+// the parsed McqRow objects sent from the renderer (see src/types.ts).
 
 export interface ExportOptions {
-  format: 'json' | 'docx' | 'pdf'
+  format: 'json' | 'docx' | 'pdf' | 'xlsx'
   // JSON
   includeExplanation?: boolean
   includeRationale?: boolean
@@ -260,6 +261,84 @@ export async function buildDocx(
 
   const doc = new Document({ sections: [{ children }] })
   return Packer.toBuffer(doc) as Promise<Buffer>
+}
+
+// --- XLSX via SheetJS (pure JS, works in the main process without native build) ---
+export function buildXlsx(rows: ExportRow[], o: ExportOptions): Buffer {
+  const headers: string[] = ['#', 'Question', 'A', 'B', 'C', 'D', 'Answer']
+  if (o.metadata !== false) {
+    headers.push('Bloom', 'Difficulty', 'Type', 'Source Heading', 'Q#')
+  }
+  if (o.includeExplanation !== false) {
+    headers.push('Explanation')
+  }
+  if (o.includeRationale) {
+    headers.push('Rationale A', 'Rationale B', 'Rationale C', 'Rationale D')
+  }
+
+  const aoa: (string | number | null)[][] = [headers]
+  rows.forEach((r, i) => {
+    const sorted = [...r.options].sort((a, b) =>
+      (a.label ?? '').localeCompare(b.label ?? ''),
+    )
+    const answer = sorted.find((op) => op.is_correct)?.label ?? ''
+    const row: (string | number | null)[] = [
+      i + 1,
+      r.question,
+      sorted[0]?.text ?? '',
+      sorted[1]?.text ?? '',
+      sorted[2]?.text ?? '',
+      sorted[3]?.text ?? '',
+      answer,
+    ]
+    if (o.metadata !== false) {
+      row.push(
+        r.bloom_level,
+        r.difficulty,
+        r.question_type,
+        r.source_heading,
+        r.question_number,
+      )
+    }
+    if (o.includeExplanation !== false) {
+      row.push(r.explanation ?? '')
+    }
+    if (o.includeRationale) {
+      row.push(
+        sorted[0]?.distractor_rationale ?? '',
+        sorted[1]?.distractor_rationale ?? '',
+        sorted[2]?.distractor_rationale ?? '',
+        sorted[3]?.distractor_rationale ?? '',
+      )
+    }
+    aoa.push(row)
+  })
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  // Freeze header row and set reasonable column widths
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+  ws['!cols'] = [
+    { wch: 4 },  // #
+    { wch: 60 }, // Question
+    { wch: 36 }, // A
+    { wch: 36 }, // B
+    { wch: 36 }, // C
+    { wch: 36 }, // D
+    { wch: 8 },  // Answer
+    { wch: 12 }, // Bloom
+    { wch: 12 }, // Difficulty
+    { wch: 16 }, // Type
+    { wch: 28 }, // Source Heading
+    { wch: 5 },  // Q#
+    { wch: 60 }, // Explanation
+    { wch: 40 }, // Rationale A
+    { wch: 40 }, // Rationale B
+    { wch: 40 }, // Rationale C
+    { wch: 40 }, // Rationale D
+  ]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'MCQs')
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
 }
 
 // Write a string or buffer to disk (target chosen via save dialog in ipc.ts).
