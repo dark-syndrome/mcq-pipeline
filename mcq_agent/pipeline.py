@@ -576,39 +576,84 @@ def run_pipeline(
 
     # ------------------------------------------------------------------
     # Stages 2+3 — Generate → Validate → Critique (with retry loop)
+    #
+    # Generation fans out across the Bloom levels the concept map actually
+    # supports: one Generator call per level, each at that level's configured
+    # temperature (settings.bloom_temperatures). The run's deficit is split
+    # across active levels each attempt. If no concept declares a Bloom level
+    # (degenerate source), fall back to a single flat-temperature call.
     # ------------------------------------------------------------------
     max_retries = settings.guarantee_n_retries
     attempt = 0
+    # enable_per_bloom_generation=False forces the legacy single batched call
+    # (the degenerate empty-active-levels branch below). A/B toggle / revert switch.
+    active_levels = (
+        generator_mod._active_bloom_levels(concept_map)
+        if settings.enable_per_bloom_generation else []
+    )
+    log.info("pipeline_generation_mode",
+             per_bloom=settings.enable_per_bloom_generation,
+             active_levels=[b.value for b in active_levels])
 
     while len(final_mcqs) < config.num_questions:
         deficit = config.num_questions - len(final_mcqs)
-        retry_config = config.model_copy(update={"num_questions": deficit})
 
         log.info("pipeline_generate_attempt", attempt=attempt + 1,
                  need=deficit, have=len(final_mcqs))
 
-        candidates, gen_usage = generator_mod.generate_mcqs(
-            document, concept_map, retry_config, settings, llm_client
-        )
-        gen_usages.append(gen_usage)
-        batch_count = len(candidates)
-        total_generated += batch_count
-        log.info("pipeline_generate_done", generated=batch_count,
-                 tokens_in=gen_usage.input_tokens, tokens_out=gen_usage.output_tokens)
+        # Plan the per-level calls for this attempt: (bloom_target, count, temp).
+        if active_levels:
+            alloc = generator_mod._distribute_deficit(deficit, active_levels, concept_map)
+            level_plan = [
+                (lvl, q, getattr(settings.bloom_temperatures, lvl.value))
+                for lvl, q in alloc.items()
+            ]
+        else:
+            # Degenerate fallback — legacy single flat-temperature call.
+            level_plan = [(None, deficit, None)]
 
-        all_failed = _process_batch(
-            candidates=candidates,
-            document=document,
-            config=retry_config,
-            settings=settings,
-            llm_client=llm_client,
-            final_mcqs=final_mcqs,
-            rejected_mcqs=rejected_mcqs,
-            critic_usages=critic_usages,
-            gen_usages=gen_usages,
-        )
+        attempt_generated = 0
+        for bloom_target, count, lvl_temp in level_plan:
+            # A prior level this attempt may have already satisfied the run.
+            if len(final_mcqs) >= config.num_questions:
+                break
 
-        # ── Checkpoint: flush accepted questions to disk after every batch ──
+            level_config = config.model_copy(update={"num_questions": count})
+            concept_slice = (
+                generator_mod._concepts_for_bloom(concept_map, bloom_target)
+                if bloom_target is not None else None
+            )
+
+            candidates, gen_usage = generator_mod.generate_mcqs(
+                document, concept_map, level_config, settings, llm_client,
+                concept_slice=concept_slice,
+                temperature_override=lvl_temp,
+                bloom_target=bloom_target,
+            )
+            gen_usages.append(gen_usage)
+            batch_count = len(candidates)
+            total_generated += batch_count
+            attempt_generated += batch_count
+            # One stage_progress per level — the GUI reducer sums `generated`.
+            log.info("pipeline_generate_done", generated=batch_count,
+                     bloom_level=bloom_target.value if bloom_target else "flat",
+                     tokens_in=gen_usage.input_tokens, tokens_out=gen_usage.output_tokens)
+
+            # IMPORTANT: pass the FULL config so _process_batch's early-stop is the
+            # run target (config.num_questions), not this level's per-call quota.
+            _process_batch(
+                candidates=candidates,
+                document=document,
+                config=config,
+                settings=settings,
+                llm_client=llm_client,
+                final_mcqs=final_mcqs,
+                rejected_mcqs=rejected_mcqs,
+                critic_usages=critic_usages,
+                gen_usages=gen_usages,
+            )
+
+        # ── Checkpoint: flush accepted questions to disk after every attempt ──
         # This ensures accepted questions are never lost if the pipeline
         # crashes during a later generation or critic call.
         if final_mcqs:
@@ -619,7 +664,7 @@ def run_pipeline(
                 file=f"{run_label}_accepted.json",
             )
 
-        if attempt == 0 and batch_count > 0 and all_failed == batch_count:
+        if attempt == 0 and attempt_generated > 0 and len(final_mcqs) == 0:
             _log_partial_cost(
                 run_id=run_id,
                 analyzer_usages=analyzer_usages,
@@ -648,6 +693,19 @@ def run_pipeline(
                             produced=len(final_mcqs),
                             retries_used=attempt - 1)
             break
+
+    # Emit the Generate stage_done with aggregate generator cost (GUI §8.2).
+    # Generation is a retry/per-Bloom loop, so this is the summed cost of every
+    # generator call, surfaced once the loop is complete.
+    _g_in, _g_out = (sum(u.input_tokens for u in gen_usages),
+                     sum(u.output_tokens for u in gen_usages))
+    _gen_cost = LLMClient.estimate_cost(
+        TokenUsage(input_tokens=_g_in, output_tokens=_g_out, model=""),
+        settings.generator_pricing.input_per_million_tokens,
+        settings.generator_pricing.output_per_million_tokens,
+    )
+    log.info("pipeline_generate_stage_done", tokens_in=_g_in, tokens_out=_g_out,
+             cost=round(_gen_cost, 6))
 
     # ------------------------------------------------------------------
     # Stage 4 — Reframe rejected MCQs (targeted fixes, not full regen)
@@ -680,11 +738,32 @@ def run_pipeline(
             # Surface each salvaged question to the live feed (GUI --json-events).
             log.info("pipeline_salvaged_accepted", stem=mcq.question[:100],
                      difficulty=mcq.difficulty.value, bloom_level=mcq.bloom_level.value)
+        _r_in, _r_out = (sum(u.input_tokens for u in reframe_usages),
+                         sum(u.output_tokens for u in reframe_usages))
+        _reframe_cost = LLMClient.estimate_cost(
+            TokenUsage(input_tokens=_r_in, output_tokens=_r_out, model=""),
+            settings.critic_pricing.input_per_million_tokens,
+            settings.critic_pricing.output_per_million_tokens,
+        )
         log.info(
             "pipeline_reframe_done",
             salvaged=len(salvaged),
             still_rejected=len(still_rejected),
+            tokens_in=_r_in, tokens_out=_r_out,
+            cost=round(_reframe_cost, 6),
         )
+
+    # ------------------------------------------------------------------
+    # Emit the final rejections to the GUI stream (GUI spec §8.2). Emitted here,
+    # after reframe, so the count matches run_complete.rejected — a question
+    # rejected mid-generation may still have been salvaged by the reframer.
+    # failure_class reuses the reframer's taxonomy (A–E / SKIP).
+    # ------------------------------------------------------------------
+    from .reframer import classify_rejection
+    for mcq, critique in rejected_mcqs:
+        failure_class, _ = classify_rejection(mcq, critique)
+        log.info("pipeline_question_rejected",
+                 failure_class=failure_class, issues=critique.issues)
 
     # ------------------------------------------------------------------
     # Per-stage cost accounting

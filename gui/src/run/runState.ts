@@ -34,12 +34,18 @@ export interface AcceptedItem {
   salvaged: boolean
 }
 
+export interface RejectedItem {
+  failureClass: string
+  issues: string[]
+}
+
 export interface RunState {
   runId: string | null
   running: boolean
   stages: StageState[]
   generated: number
   accepted: AcceptedItem[]
+  rejected: RejectedItem[]
   summary: RunCompleteEvent | null
   error: { stage: string; message: string } | null
   analyzeCost: number
@@ -52,6 +58,7 @@ export function initialRunState(): RunState {
     stages: STAGE_DEFS.map((s) => ({ id: s.id, status: 'pending', detail: '' })),
     generated: 0,
     accepted: [],
+    rejected: [],
     summary: null,
     error: null,
     analyzeCost: 0,
@@ -75,6 +82,11 @@ function stageDoneDetail(ev: StageDoneEvent): string {
       )
     case 'linter_l2':
       return `Density check: ${ev.status ?? 'done'}`
+    case 'generate':
+      return (
+        `${ev.tokens_in ?? 0} in · ${ev.tokens_out ?? 0} out` +
+        (typeof ev.cost === 'number' ? ` · $${ev.cost.toFixed(3)}` : '')
+      )
     case 'reframe':
       return (
         `Salvaged ${ev.salvaged ?? 0}` +
@@ -159,6 +171,15 @@ export function runReducer(
             bloom: ev.bloom_level,
             salvaged: ev.salvaged,
           },
+        ],
+      }
+
+    case 'question_rejected':
+      return {
+        ...state,
+        rejected: [
+          ...state.rejected,
+          { failureClass: ev.failure_class, issues: ev.issues },
         ],
       }
 

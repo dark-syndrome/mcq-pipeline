@@ -73,14 +73,15 @@ def _configure_logging(verbose: bool) -> None:
 #                      <detail: chars|sections|concepts|status|salvaged|still_rejected>}
 #   stage_progress    {event, stage:"generate", generated, tokens_in, tokens_out}
 #   question_accepted {event, total_accepted, stem, difficulty, bloom_level, salvaged}
+#   question_rejected {event, failure_class, issues}
 #   run_complete      {event, run_id, run_label, generated, accepted, salvaged,
 #                      rejected, requested, cost_usd, cost_breakdown{...}, output_files{...}}
 #   error             {event, stage, message, retryable}
 # stage ids: parse | linter_l1 | analyze | linter_l2 | generate | reframe
 #
-# KNOWN GAP (tracked in docs/BUILD_CHECKLIST.md): the spec's `question_rejected`
-# event is not yet emitted, and `generate`/`critic` per-stage cost is only
-# reported in aggregate via run_complete.cost_breakdown (not per stage_done).
+# Per-stage cost: the `generate` and `reframe` stages now carry aggregate
+# tokens_in/tokens_out/cost on their stage_done events. `critic` has no timeline
+# stage of its own — its cost remains in run_complete.cost_breakdown.critic.
 
 # internal structlog event  →  GUI "stage_done" stage id
 _STAGE_DONE_MAP = {
@@ -88,6 +89,7 @@ _STAGE_DONE_MAP = {
     "pipeline_linter_done": "linter_l1",
     "pipeline_analyze_done": "analyze",
     "pipeline_density_check_done": "linter_l2",
+    "pipeline_generate_stage_done": "generate",
     "pipeline_reframe_done": "reframe",
 }
 # internal structlog event  →  GUI "stage_start" stage id
@@ -144,6 +146,12 @@ def _json_event_processor(logger, method_name, event_dict):
             "difficulty": event_dict.get("difficulty"),
             "bloom_level": event_dict.get("bloom_level"),
             "salvaged": name == "pipeline_salvaged_accepted",
+        })
+    elif name == "pipeline_question_rejected":
+        _emit({
+            "event": "question_rejected",
+            "failure_class": event_dict.get("failure_class"),
+            "issues": event_dict.get("issues", []),
         })
 
     raise structlog.DropEvent  # nothing reaches stdout except our emitted events

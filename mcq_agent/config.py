@@ -94,9 +94,15 @@ class Settings(BaseSettings):
     critic_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     analyzer_temperature: float = Field(default=0.2, ge=0.0, le=1.0)
 
-    # Per-Bloom-level generation temperature (Model tab §3.4). Schema only for
-    # now — not yet consumed by the Generator (tracked in BUILD_CHECKLIST).
+    # Per-Bloom-level generation temperature (Model tab §3.4), consumed by the
+    # Generator when enable_per_bloom_generation is True.
     bloom_temperatures: BloomTemperatures = Field(default_factory=BloomTemperatures)
+
+    # When True, the Generator makes one call per active Bloom level (each at its
+    # bloom_temperatures value). When False (default), it makes a single batched
+    # call at the flat `temperature` — the original, cheaper behaviour. Toggle for
+    # A/B testing the cost/quality trade-off (scripts/ab_bloom_tokens.py).
+    enable_per_bloom_generation: bool = False
 
     # -- Token budgets --------------------------------------------------------
     max_tokens: int = Field(default=16000, ge=1)

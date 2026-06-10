@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import StageTimeline from './StageTimeline'
 import AcceptedFeed from './AcceptedFeed'
+import RejectedFeed from './RejectedFeed'
 import CompletionCard from './CompletionCard'
 import { initialRunState, runReducer } from '../run/runState'
 import { useStore } from '../store'
@@ -32,14 +33,16 @@ export default function RunExecution({
   useEffect(() => {
     const off = window.api.onPipelineEvent((raw) => {
       const ev = raw as PipelineEvent | ProcessExitEvent
-      // Session-cost side effects: analyze cost as it streams, then the
-      // remainder (generator/critic/reframer) at completion.
+      // Session-cost side effects: every stage_done that carries a cost streams
+      // in live (analyze, generate, reframe). At completion add only the critic
+      // cost — the one stage with no timeline event — so the total equals cost_usd
+      // without double-counting the stages already added above.
       if (ev.event === 'stage_done' && typeof (ev as StageDoneEvent).cost === 'number') {
         addSessionCost((ev as StageDoneEvent).cost as number)
       }
       if (ev.event === 'run_complete') {
         const rc = ev as RunCompleteEvent
-        addSessionCost(Math.max(0, rc.cost_usd - rc.cost_breakdown.analyzer))
+        addSessionCost(Math.max(0, rc.cost_breakdown.critic))
         void window.api.db.reload().then(() => hydrate())
       }
       dispatch(ev)
@@ -95,6 +98,12 @@ export default function RunExecution({
         <StageTimeline stages={state.stages} now={now} />
         <AcceptedFeed items={state.accepted} target={params.count ?? 0} />
       </div>
+
+      {(state.rejected.length > 0 || !state.running) && (
+        <div className="mt-6">
+          <RejectedFeed items={state.rejected} />
+        </div>
+      )}
 
       {state.error && (
         <div className="mt-6 rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm text-danger">

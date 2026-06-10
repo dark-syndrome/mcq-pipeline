@@ -47,7 +47,7 @@ analyzer_temperature: 0.2
 
 # ---- Per-Bloom-level generation temperature (Model tab §3.4) -----
 # Controls how creatively the Generator approaches each cognitive level.
-# (Schema in place for the Model tab; not yet consumed by the Generator.)
+# Only consumed when enable_per_bloom_generation is true (see below).
 bloom_temperatures:
   remember: 0.5
   understand: 0.6
@@ -55,6 +55,14 @@ bloom_temperatures:
   analyze: 0.7
   evaluate: 0.8
   create: 0.9
+
+# ---- Generation mode --------------------------------------------
+# false (default) = single batched Generator call at the flat `temperature`
+#                   (original behaviour; cheaper).
+# true            = one Generator call per active Bloom level, each at its
+#                   bloom_temperatures value (~4-5x generator input tokens).
+# A/B benchmark with scripts/ab_bloom_tokens.py before enabling.
+enable_per_bloom_generation: false
 
 # ---- Per-stage token budgets ------------------------------------
 # Generator: 150 questions × 2.0 factor = 300 candidates per full pass.

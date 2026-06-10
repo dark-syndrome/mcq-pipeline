@@ -27,7 +27,7 @@ from .analyzer import load_prompt_template
 from .config import Settings
 from .llm_client import LLMClient, TokenUsage, make_client
 from .parser import ParsedDocument, build_t2_prompt_text
-from .schemas import ConceptMap, MCQ, MCQConfig
+from .schemas import BloomLevel, ConceptMap, MCQ, MCQConfig
 
 log = structlog.get_logger(__name__)
 
@@ -37,17 +37,141 @@ class MCQList(BaseModel):
     mcqs: list[MCQ]
 
 
+# ---------------------------------------------------------------------------
+# Per-Bloom-level generation planning
+# ---------------------------------------------------------------------------
+#
+# The Generator makes one LLM call per *active* Bloom level (a level supported
+# by at least one concept), each at that level's configured temperature
+# (settings.bloom_temperatures). This consumes the per-Bloom temperature matrix
+# faithfully — higher cognitive levels get a higher temperature for more
+# creative synthesis. The helpers below are pure (no I/O) so they're unit-testable.
+
+# Canonical Bloom order, foundational → advanced. Used so per-level calls run in a
+# stable order and the correct-answer-position guidance stays deterministic.
+_BLOOM_ORDER: list[BloomLevel] = [
+    BloomLevel.REMEMBER,
+    BloomLevel.UNDERSTAND,
+    BloomLevel.APPLY,
+    BloomLevel.ANALYZE,
+    BloomLevel.EVALUATE,
+    BloomLevel.CREATE,
+]
+
+# Bloom levels for which ordering / code-snippet question hints make sense.
+# Recall/comprehension batches (remember, understand) should not be pushed to
+# embed code blocks or step-sequencing tasks.
+_HIGHER_ORDER_BLOOMS: set[BloomLevel] = {
+    BloomLevel.APPLY,
+    BloomLevel.ANALYZE,
+    BloomLevel.EVALUATE,
+    BloomLevel.CREATE,
+}
+
+# Per-level directive lines injected into the Generator prompt. Aligned with the
+# <difficulty_rubric> in prompts/generator.txt.
+_BLOOM_GUIDANCE: dict[BloomLevel, str] = {
+    BloomLevel.REMEMBER: (
+        "Test direct recall of facts, terms, and definitions stated in the source. "
+        "Prefer the definition stem pattern. Maps to EASY difficulty."
+    ),
+    BloomLevel.UNDERSTAND: (
+        "Test comprehension — paraphrase, classify, or explain a concept in the "
+        "learner's own terms. Maps to EASY difficulty."
+    ),
+    BloomLevel.APPLY: (
+        "Test use of a concept in a concrete, novel scenario. Prefer the scenario "
+        "stem pattern. Maps to MEDIUM difficulty."
+    ),
+    BloomLevel.ANALYZE: (
+        "Test decomposition — compare options, identify causes, or diagnose a fault. "
+        "Prefer debugging or comparison stem patterns. Maps to HARD difficulty."
+    ),
+    BloomLevel.EVALUATE: (
+        "Test judgement between trade-offs, where no option is obviously correct "
+        "until reasoned through. Maps to EXPERT difficulty."
+    ),
+    BloomLevel.CREATE: (
+        "Test synthesis — designing or combining approaches to satisfy competing "
+        "constraints. Maps to EXPERT difficulty."
+    ),
+}
+
+
+def _active_bloom_levels(concept_map: ConceptMap) -> list[BloomLevel]:
+    """Return the Bloom levels supported by at least one concept, in canonical order."""
+    present = {b for c in concept_map.concepts for b in c.supported_bloom_levels}
+    return [b for b in _BLOOM_ORDER if b in present]
+
+
+def _concepts_for_bloom(concept_map: ConceptMap, level: BloomLevel) -> list:
+    """Return concepts whose supported_bloom_levels include `level`.
+
+    A concept supporting several levels appears in several slices — this is
+    intentional. Cross-level near-duplicates are caught downstream by the
+    validators, the critic, and the Supabase similarity gate.
+    """
+    return [c for c in concept_map.concepts if level in c.supported_bloom_levels]
+
+
+def _distribute_deficit(
+    deficit: int,
+    levels: list[BloomLevel],
+    concept_map: ConceptMap,
+) -> dict[BloomLevel, int]:
+    """Split `deficit` questions across the active Bloom `levels`.
+
+    Even split, with any remainder handed to the levels backed by the most
+    concepts (so the extra questions land where the source can sustain them).
+    Levels that would receive 0 questions are dropped (happens only when
+    deficit < len(levels)). Returns {level: question_count}, each value > 0.
+    """
+    n = len(levels)
+    if n == 0 or deficit <= 0:
+        return {}
+    base, rem = divmod(deficit, n)
+    support = {lvl: len(_concepts_for_bloom(concept_map, lvl)) for lvl in levels}
+    # Rank by concept support (desc); ties keep canonical order for determinism.
+    ranked = sorted(levels, key=lambda l: (-support[l], _BLOOM_ORDER.index(l)))
+    alloc = {lvl: base for lvl in levels}
+    for i in range(rem):
+        alloc[ranked[i]] += 1
+    return {lvl: q for lvl, q in alloc.items() if q > 0}
+
+
+def _bloom_directive(level: BloomLevel | None) -> str:
+    """Build the prompt directive that pins generation to a single Bloom level.
+
+    Returns "" when level is None (flat fallback) so the placeholder renders empty.
+    """
+    if level is None:
+        return ""
+    return (
+        f"- TARGET COGNITIVE LEVEL (Bloom's): {level.value.upper()}\n"
+        f"  Every question in this batch MUST operate at the \"{level.value}\" "
+        f"cognitive level. {_BLOOM_GUIDANCE[level]}\n"
+        f"  Emit bloom_level: \"{level.value}\" for every question, and match the "
+        f"difficulty to the <difficulty_rubric> above."
+    )
+
+
 def _filter_few_shot_examples(
     examples: list[dict],
     concept_map: ConceptMap,
     concept_slice: list | None = None,
+    bloom_target: BloomLevel | None = None,
 ) -> list[dict]:
-    """Return examples matching the exact Bloom/stem pairs requested."""
+    """Return examples matching the exact Bloom/stem pairs requested.
+
+    When bloom_target is set, additionally drop any example whose bloom_level is
+    not the target level, so a per-level call only sees on-level few-shots.
+    """
     concepts = concept_slice if concept_slice is not None else concept_map.concepts
     target_pairs = {
         (template.bloom_level.value, template.stem_pattern.value)
         for concept in concepts
         for template in concept.question_templates
+        if bloom_target is None or template.bloom_level == bloom_target
     }
 
     return [
@@ -192,6 +316,8 @@ def generate_mcqs(
     settings: Settings,
     llm_client: LLMClient,
     concept_slice: list | None = None,
+    temperature_override: float | None = None,
+    bloom_target: BloomLevel | None = None,
 ) -> tuple[list[MCQ], TokenUsage]:
     """
     Stage 2: generate candidate MCQs.
@@ -199,6 +325,11 @@ def generate_mcqs(
     If concept_slice is provided, only those concepts are injected into the
     Generator prompt. This enables concept-chunked generation where each call
     focuses on a subset of concepts for better token management.
+
+    temperature_override, when set, replaces settings.temperature for this call —
+    used by the per-Bloom-level generation loop to apply each level's configured
+    temperature. bloom_target, when set, pins the batch to a single cognitive
+    level (injected as a prompt directive and used to filter few-shot examples).
     """
     from .config import load_dotenv_and_get_api_key
 
@@ -233,6 +364,7 @@ def generate_mcqs(
             few_shot_data,
             concept_map,
             concept_slice=concept_slice,
+            bloom_target=bloom_target,
         )
         few_shot_str = json.dumps(filtered_few_shot_data, indent=2)
         log.info(
@@ -264,19 +396,24 @@ def generate_mcqs(
     concept_map_text = _slim_concept_map(concept_map, concept_slice=concept_slice)
 
     # Build the mixed-types hint injected into the <configuration> block.
+    # Ordering and code-snippet questions are higher-order (apply+) cognitive
+    # tasks; suppress those hints for remember/understand per-Bloom batches so the
+    # level directive and the type hint don't pull in opposite directions.
     has_code_examples = bool(concept_map.code_examples)
     has_procedures = bool(concept_map.procedures)
+    higher_order = bloom_target is None or bloom_target in _HIGHER_ORDER_BLOOMS
     if settings.mixed_question_types:
         parts = [
             "- Question type distribution: mixed",
             "  * ~60% single_correct (standard multiple-choice)",
         ]
-        if has_procedures:
+        if has_procedures and higher_order:
             parts.append("  * ~20% ordering (step-sequencing for procedures/workflows)")
-        if has_code_examples:
+        if has_code_examples and higher_order:
             parts.append("  * ~20% code-snippet-based (embed a code block in the stem)")
-        if not has_procedures and not has_code_examples:
-            parts.append("  * Additional single_correct only (no procedures or code examples found)")
+        if len(parts) == 2:
+            parts.append("  * Additional single_correct only "
+                         "(no suitable procedures or code examples for this level)")
         mixed_types_hint = "\n".join(parts)
     else:
         mixed_types_hint = ""
@@ -293,6 +430,11 @@ def generate_mcqs(
         .replace("{few_shot_examples}", few_shot_str)
         .replace("{num_questions_to_generate}", str(num_to_generate))
         .replace("{mixed_types_hint}", mixed_types_hint)
+        .replace("{bloom_directive}", _bloom_directive(bloom_target))
+    )
+
+    effective_temp = (
+        temperature_override if temperature_override is not None else settings.temperature
     )
 
     log.info(
@@ -300,6 +442,8 @@ def generate_mcqs(
         num_requested=config.num_questions,
         num_to_generate=num_to_generate,
         difficulty=config.difficulty.value,
+        bloom_target=bloom_target.value if bloom_target else "flat",
+        temperature=effective_temp,
         model=resolved_model,
         provider=resolved_provider.value,
         concept_slice_size=len(concept_slice) if concept_slice else len(concept_map.concepts),
@@ -313,7 +457,7 @@ def generate_mcqs(
     mcq_list, usage = stage_client.call(
         prompt=prompt,
         response_model=MCQList,
-        temperature=settings.temperature,
+        temperature=effective_temp,
         model=resolved_model,
         max_tokens=settings.max_tokens,
     )

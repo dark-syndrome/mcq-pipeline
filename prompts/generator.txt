@@ -15,6 +15,7 @@ You are an expert assessment designer creating multiple-choice questions for tec
 - Number of options per question: {num_options}
 - Topic filter (if any): {topic_filter}
 {mixed_types_hint}
+{bloom_directive}
 </configuration>
 
 <difficulty_rubric>

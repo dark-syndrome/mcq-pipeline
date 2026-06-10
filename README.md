@@ -1,6 +1,8 @@
-# MCQ Pipeline — Master Reference
+# MCQ Pipeline
 
 > **Returning after a break?** Jump to [Quick-Start Checklist](#0-quick-start-checklist).
+
+An LLM-powered pipeline that transforms Markdown lesson files into production-quality multiple-choice questions. Ships with a full-featured Electron desktop GUI for operators who prefer a graphical interface, and a Python CLI for scripted/batch use.
 
 ---
 
@@ -8,34 +10,32 @@
 
 0. [Quick-Start Checklist](#0-quick-start-checklist)
 1. [What This Project Does](#1-what-this-project-does)
-2. [Architecture Overview](#2-architecture-overview)
-3. [Environment Setup (from scratch)](#3-environment-setup-from-scratch)
+2. [System Architecture](#2-system-architecture)
+   - 2.1 [Component Overview](#21-component-overview)
+   - 2.2 [Pipeline Data Flow](#22-pipeline-data-flow)
+   - 2.3 [GUI Architecture](#23-gui-architecture)
+   - 2.4 [Two-Store Data Architecture](#24-two-store-data-architecture)
+3. [Environment Setup](#3-environment-setup)
    - 3.1 [Prerequisites](#31-prerequisites)
-   - 3.2 [Create the virtual environment](#32-create-the-virtual-environment)
-   - 3.3 [Configure API keys (.env)](#33-configure-api-keys-env)
-   - 3.4 [Verify the install](#34-verify-the-install)
-4. [Configuration Reference (config.yaml)](#4-configuration-reference-configyaml)
-5. [LLM Providers](#5-llm-providers)
-6. [The Pipeline — Stage by Stage](#6-the-pipeline--stage-by-stage)
-   - [Stage 0 — Parse](#stage-0--parse)
-   - [Stage 1 — Analyze](#stage-1--analyze)
-   - [Stage 2 — Generate](#stage-2--generate)
-   - [Stage 3 — Critique](#stage-3--critique)
-   - [Stage 4 — Reframe](#stage-4--reframe)
-   - [Quality Gates](#quality-gates)
-   - [Guarantee-N Retry Loop](#guarantee-n-retry-loop)
-7. [Storage: SQLite + Supabase](#7-storage-sqlite--supabase)
-   - 7.1 [SQLite (local — always active)](#71-sqlite-local--always-active)
-   - 7.2 [Concept Map Cache](#72-concept-map-cache)
-   - 7.3 [Supabase (cloud — optional)](#73-supabase-cloud--optional)
-   - 7.4 [Deduplication Algorithm](#74-deduplication-algorithm)
-8. [Module Reference](#8-module-reference)
-9. [Data Models](#9-data-models)
-10. [CLI Reference](#10-cli-reference)
-11. [Output Files](#11-output-files)
-12. [Quality Rules — Design Rationale](#12-quality-rules--design-rationale)
-13. [GUI Roadmap](#13-gui-roadmap)
-14. [Troubleshooting](#14-troubleshooting)
+   - 3.2 [Python Environment](#32-python-environment)
+   - 3.3 [API Keys (.env)](#33-api-keys-env)
+   - 3.4 [GUI Setup (Node.js)](#34-gui-setup-nodejs)
+   - 3.5 [Verify the Install](#35-verify-the-install)
+4. [Running the Application](#4-running-the-application)
+   - 4.1 [CLI](#41-cli)
+   - 4.2 [Electron GUI](#42-electron-gui)
+5. [Configuration Reference](#5-configuration-reference-configyaml)
+6. [LLM Providers](#6-llm-providers)
+7. [The Pipeline — Stage by Stage](#7-the-pipeline--stage-by-stage)
+8. [Storage: SQLite + Supabase](#8-storage-sqlite--supabase)
+9. [GUI Tab Reference](#9-gui-tab-reference)
+10. [Module Reference](#10-module-reference)
+11. [Data Models](#11-data-models)
+12. [CLI Reference](#12-cli-reference)
+13. [Output Files](#13-output-files)
+14. [Production-Grade Engineering](#14-production-grade-engineering)
+15. [Quality Rules — Design Rationale](#15-quality-rules--design-rationale)
+16. [Troubleshooting](#16-troubleshooting)
 
 ---
 
@@ -44,29 +44,22 @@
 Use this every time you return to the project after a break.
 
 ```
-[ ] 1. Open a terminal in:  C:\Users\Akash\Documents\mcq_pipeline
+[ ] 1. Open terminal in:  C:\Users\Akash\Documents\mcq_pipeline
 
-[ ] 2. Activate the virtual environment:
+[ ] 2. Activate Python environment:
         PowerShell:       .\.venv\Scripts\Activate.ps1
-        Command Prompt:   .\.venv\Scripts\activate.bat
         Prompt shows (.venv) when active.
 
-[ ] 3. If step 2 fails (venv missing), rebuild it:
-        .\setup_venv.ps1        ← PowerShell
-        setup_venv.bat          ← Command Prompt
+[ ] 3. CLI smoke test:
+        python -m pytest tests/ -v
 
-[ ] 4. Confirm install is healthy:
-        python -m pytest tests/ -v     (5 smoke tests, no API calls)
-
-[ ] 5. Check .env has a valid API key for the configured provider:
-        Current default provider: openrouter
-        Key needed:               OPENROUTER_API_KEY=sk-or-...
-
-[ ] 6. Run a quick test generation:
+[ ] 4. Generate questions (CLI):
         mcq-agent generate examples/sample_lesson.md --count 3
 
-[ ] 7. Check output/:
-        ls output/    (should show 4 files per run)
+[ ] 5. Launch GUI (separate terminal, no venv needed):
+        cd gui
+        npm run dev
+        # Electron window opens automatically
 ```
 
 ---
@@ -76,23 +69,65 @@ Use this every time you return to the project after a break.
 The **MCQ Agent** is an AI-powered pipeline that transforms Markdown lesson files into high-quality Multiple-Choice Questions ready for use in courses. Given a `.md` file, it:
 
 1. Analyses the document and extracts a structured **concept map** (concepts, procedures, facts, code examples)
-2. Generates MCQ candidates covering the lesson's key ideas using compressed document summaries
+2. Generates MCQ candidates covering the lesson's key ideas using per-Bloom-level compressed document summaries
 3. Runs every candidate through **7 deterministic rule checks** (free, no API cost)
 4. Evaluates each candidate against **13 quality criteria** via an independent LLM Critic
 5. Salvages borderline rejections through targeted rewrites (**Reframer**, 5-class taxonomy)
 6. Stores all results in a local SQLite database and optionally syncs a deduplicated set to Supabase cloud
 
-**What it is NOT:** a simple "ask GPT to write questions" script. Every MCQ must pass deterministic validators, an independent LLM critic, and a class-based reframer before it is accepted. A deduplication gate prevents re-generating questions already in the bank.
+The Electron GUI provides a graphical operator interface over the same pipeline and question bank — run generation, browse/filter questions, export DOCX/PDF/JSON, monitor costs, curate eval sets, and adjust model config, all without touching the command line.
 
-**Key design principles:**
-- **Quality over quantity:** multiple retry loops + Reframer before giving up on any question
-- **Cost efficiency:** the most expensive LLM call (Analyzer) is MD5-cached in SQLite and never re-runs on unchanged source files; each stage uses the cheapest model that can handle it
-- **Two-store architecture:** SQLite is the authoritative local log; Supabase is the clean, deduplicated cloud bank with gapless question numbers
-- **Structured output throughout:** every LLM response is a validated Pydantic model via `instructor` — never raw text
+**What it is NOT:** a simple "ask GPT to write questions" script. Every MCQ must pass deterministic validators, an independent LLM critic, and a class-based reframer before it is accepted. A deduplication gate prevents re-generating questions already in the bank.
 
 ---
 
-## 2. Architecture Overview
+## 2. System Architecture
+
+### 2.1 Component Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          MCQ Pipeline — System Map                           │
+│                                                                               │
+│  ┌──────────────────────────────────────┐  ┌──────────────────────────────┐ │
+│  │       Electron Desktop GUI (gui/)     │  │   Python CLI (mcq_agent/)    │ │
+│  │                                       │  │                               │ │
+│  │  React + Vite renderer (5 tabs)       │  │  mcq-agent generate <file>    │ │
+│  │  ◄──contextBridge──► Electron main   │  │  mcq-agent list-runs          │ │
+│  │  Electron main spawns Python sidecar  │  │  mcq-agent show-run <id>      │ │
+│  │  GUI reads DB via sql.js (WASM)       │  │  mcq-agent push-supabase      │ │
+│  │  Python owns all DB writes            │  │                               │ │
+│  └────────────────┬─────────────────────┘  └──────────────┬────────────────┘ │
+│                   │ spawns                                  │                  │
+│  ┌────────────────▼─────────────────────────────────────── ▼ ───────────────┐ │
+│  │                     Python Pipeline (mcq_agent/)                          │ │
+│  │                                                                            │ │
+│  │  Parse ──► Analyze ──► Generate ──► Validate ──► Critique ──► Reframe    │ │
+│  │   T1/T2/T3   ConceptMap  per-Bloom    7 rules    13 criteria  5 classes  │ │
+│  │   tiers      MD5 cache   fan-out      free        LLM judge   LLM fix    │ │
+│  │                                                                            │ │
+│  │  instructor + Pydantic v2 enforces structured output at every LLM stage  │ │
+│  └────────────────────────────────┬───────────────────────────────────────── ┘ │
+│                                    │ writes                                   │
+│  ┌─────────────────────────────────▼──────────────────────────────────────┐  │
+│  │  logs/runs.db  (SQLite — Python writes, GUI reads via sql.js WASM)      │  │
+│  │  runs · mcqs (passed + rejected) · concept_maps (analyzer cache)        │  │
+│  └─────────────────────────────────┬──────────────────────────────────────┘  │
+│                                     │ optional dedup sync                     │
+│  ┌──────────────────────────────────▼─────────────────────────────────────┐  │
+│  │  Supabase (cloud — optional)                                             │  │
+│  │  accepted + deduplicated questions only · gapless question_number        │  │
+│  │  token_set_ratio dedup gate (rapidfuzz) · service_role key via Python    │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  eval-sets/  (JSON files — GUI-owned annotation data)                   │  │
+│  │  EvalSet · EvalAnnotation (ratings, confirmed flag, notes)              │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 Pipeline Data Flow
 
 ```
 Input (.md file)
@@ -100,118 +135,193 @@ Input (.md file)
        ▼
 ┌──────────────────────────────────────┐
 │  parser.py — Stage 0                 │
-│  Builds THREE document tiers at once:│
-│  T1: raw_text   (full Markdown)      │ ← Analyzer only
-│  T2: section_summaries               │ ← Generator, Reframer
-│       (first 3 sentences + code)     │
-│  T3: section_fingerprints            │ ← Critic (source slicing)
-│       (heading + top-20 key terms)   │
+│  Three document tiers in one read:   │
+│  T1: raw_text   (full Markdown)      │ ◄─ Analyzer only (once, then cached)
+│  T2: section_summaries               │ ◄─ Generator, Reframer (~30–60% of T1)
+│  T3: section_fingerprints            │ ◄─ Critic source-slicing (~5–10% of T1)
 └───────────────┬──────────────────────┘
                 │
                 ▼
 ┌──────────────────────────────────────┐
-│  source_linter.py — Layer 1          │  FREE — static checks
-│  word count, section count,          │  FAIL → abort before any API call
-│  thin sections, code density         │
+│  source_linter.py — Layer 1 (FREE)   │
+│  word count · sections · code density│  FAIL → abort before any API call
 └───────────────┬──────────────────────┘
                 │
                 ▼
 ┌──────────────────────────────────────┐
-│  analyzer.py — Stage 1               │  PREMIUM MODEL, runs ONCE then cached
-│  Checks SQLite cache by MD5 first.   │  Cache hit = zero tokens
-│  On miss: sends T1 to LLM →          │
-│  returns ConceptMap, saves to cache  │
+│  analyzer.py — Stage 1               │  Premium model · runs ONCE · cached
+│  MD5(source) → SQLite cache check    │  Cache hit = 0 tokens, ~0ms
+│  Cache miss → LLM → ConceptMap       │
 └───────────────┬──────────────────────┘
                 │
                 ▼
 ┌──────────────────────────────────────┐
-│  source_linter.py — Layer 2          │  FREE — uses Analyzer output
-│  concept density, procedural         │  FAIL → abort
-│  richness, technical fact count      │
+│  source_linter.py — Layer 2 (FREE)   │
+│  concept density · procedural rich.  │  FAIL → abort
 └───────────────┬──────────────────────┘
                 │
-         ┌──────▼──────────────────────────────────────────────┐
-         │  GUARANTEE-N RETRY LOOP (up to guarantee_n_retries)  │
-         │                                                       │
-         │  ┌─────────────────────────────────────────────────┐ │
-         │  │  generator.py — Stage 2                         │ │
-         │  │  T2 + slim ConceptMap → candidate MCQs          │ │
-         │  │  Generates n × over_generation_factor           │ │
-         │  └─────────────────┬───────────────────────────────┘ │
-         │                    │                                  │
-         │  ┌─────────────────▼───────────────────────────────┐ │
-         │  │  validators.py — 7 rule checks (FREE)           │ │
-         │  │  grounding, uniqueness, length parity, etc.     │ │
-         │  └─────────────────┬───────────────────────────────┘ │
-         │                    │                                  │
-         │  ┌─────────────────▼───────────────────────────────┐ │
-         │  │  critic.py — Stage 3                            │ │
-         │  │  LLM evaluates each MCQ against 13 criteria     │ │
-         │  │  Uses T3 fingerprints to find relevant section  │ │
-         │  └───────┬─────────────────────┬───────────────────┘ │
-         │        PASS                  FAIL                     │
-         │          │                    │                       │
-         │          │       ┌────────────▼──────────────────┐   │
-         │          │       │  reframer.py — Stage 4        │   │
-         │          │       │  Classify failure → targeted  │   │
-         │          │       │  fix → re-validate            │   │
-         │          │       └────────────┬──────────────────┘   │
-         │          │                 PASS / FAIL                │
-         │          └──────────┬──────────────────────────────  │
-         │               accepted_count >= target?               │
-         │               YES → exit loop                         │
-         │               NO  → next retry                        │
-         └─────────────────────────────────────────────────────-┘
+       ┌────────▼──────────────────────────────────────────────────┐
+       │  GUARANTEE-N RETRY LOOP  (up to guarantee_n_retries)       │
+       │                                                             │
+       │  ┌──────────────────────────────────────────────────────┐  │
+       │  │  generator.py — Stage 2                              │  │
+       │  │  One LLM call per active Bloom level (fan-out)       │  │
+       │  │  Each call uses its own bloom_temperatures[level]    │  │
+       │  │  Generates n × over_generation_factor candidates     │  │
+       │  └────────────────────┬─────────────────────────────────┘  │
+       │                       │                                     │
+       │  ┌────────────────────▼─────────────────────────────────┐  │
+       │  │  validators.py — 7 deterministic checks (FREE)       │  │
+       │  │  source grounding · uniqueness · option count        │  │
+       │  │  length parity · bloom/difficulty · source phrases   │  │
+       │  └────────────────────┬─────────────────────────────────┘  │
+       │                       │                                     │
+       │  ┌────────────────────▼─────────────────────────────────┐  │
+       │  │  critic.py — Stage 3                                 │  │
+       │  │  T3 fingerprints → find relevant source section      │  │
+       │  │  LLM evaluates against 13 quality criteria           │  │
+       │  └─────────┬───────────────────────┬────────────────────┘  │
+       │          PASS                    FAIL                       │
+       │            │              ┌────────▼─────────────────────┐  │
+       │            │              │  reframer.py — Stage 4       │  │
+       │            │              │  Classify → A/B/C/D/E/SKIP   │  │
+       │            │              │  Targeted fix → re-validate  │  │
+       │            │              └────────┬─────────────────────┘  │
+       │            │                    PASS / FAIL                  │
+       │            └──────────┬───────────────────────────────────  │
+       │              accepted >= target? → exit · else next retry   │
+       └───────────────────────────────────────────────────────────--┘
                 │
                 ▼
 ┌──────────────────────────────────────┐
-│  supabase_gate.py (if enabled)        │  Cross-bank dedup via token_set_ratio
-│  Fetch existing → similarity filter  │  Drops questions scoring ≥ threshold
-│  → renumber survivors → push         │
+│  supabase_gate.py (if enabled)        │  token_set_ratio dedup · renumber
+│  fetch existing → similarity filter  │  idempotent push (skip dup run_id)
 └───────────────┬──────────────────────┘
                 │
                 ▼
-        SQLite (logs/runs.db)
-        output/ JSON files (4 per run)
+        logs/runs.db (SQLite)       output/ JSON files (4 per run)
 ```
 
-**Token efficiency by tier:**
+**Token efficiency — why the tiered approach matters:**
 
-| Tier | Content | Token size vs T1 | Used by |
-|------|---------|-----------------|---------|
-| T1 | Full Markdown | 100% | Analyzer (once, cached) |
-| T2 | First 3 sentences + code blocks per section | ~30–60% | Generator, Reframer |
-| T3 | Heading + top-20 key terms per section | ~5–10% | Critic source slicing |
+| Stage | Naïve (full doc every call) | Tiered (T1/T2/T3) | Saving |
+|---|---|---|---|
+| Analyzer | 5 000 tok × every run | 5 000 tok × 1, then 0 | 100% on repeats |
+| Generator input (10 MCQs) | ~50 000 tok | ~15 000 tok | ~70% |
+| Critic input per MCQ | ~5 000 tok | ~600 tok | ~88% |
+| **Total for 10 MCQs** | **~105 000 tok** | **~27 500 tok** | **~74%** |
 
-**Real-world token savings (example: 5000-word lesson, 10 MCQs):**
+### 2.3 GUI Architecture
 
-| Stage | Before T2/T3 | After T2/T3 | Saving |
-|-------|-------------|-------------|--------|
-| Analyzer | 5000 tokens × every run | 5000 tokens × 1, then 0 | 100% on repeat |
-| Generator input | ~5000 tokens | ~1500 tokens | ~70% |
-| Critic input per MCQ | ~5000 tokens | ~600 tokens | ~88% |
-| **Total for 10 MCQs** | **~105,000 tokens** | **~27,500 tokens** | **~74%** |
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         Electron App  (gui/)                                  │
+│                                                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  Renderer Process  (Vite + React 18 + TypeScript)                        │ │
+│  │                                                                           │ │
+│  │  App.tsx                                                                  │ │
+│  │   ├─ NavRail  (64 px icon rail — Zustand activeTab)                      │ │
+│  │   ├─ StatusBar  (SQLite row counts · model routing · session cost)        │ │
+│  │   └─ Tab pane  (lazy-rendered on nav)                                     │ │
+│  │       ├─ ModelTab     6 config sections · profile save/load · YAML write  │ │
+│  │       ├─ DashboardTab 4 sub-tabs: Overview · Quality · Cost · History     │ │
+│  │       ├─ FilesTab     graphical SQL query · card/table views · export     │ │
+│  │       ├─ RunTab       upload → linter → config → live timeline + feed     │ │
+│  │       └─ EvalSetTab   create/annotate/export question eval sets           │ │
+│  │                                                                           │ │
+│  │  State: Zustand store (activeTab · runState · dbReady)                   │ │
+│  │  Charts: Recharts 3.x (7 chart components)                               │ │
+│  │  Icons: Lucide-React                                                      │ │
+│  └──────────────────────────────────────┬────────────────────────────────── ┘ │
+│            contextBridge  (preload.ts — window.api — FROZEN contract)        │
+│  ┌──────────────────────────────────────▼────────────────────────────────── ┐ │
+│  │  Main Process  (Electron Node.js)                                         │ │
+│  │                                                                            │ │
+│  │  ipc.ts        30+ ipcMain.handle handlers (namespaced: db / run /        │ │
+│  │                config / lint / export / evalset / supabase / file)        │ │
+│  │  db.ts         sql.js WASM snapshot · reload() after runs · read-only    │ │
+│  │  sidecar.ts    spawn Python · readline NDJSON stream · forward events     │ │
+│  │  modelConfig.ts YAML Document setIn · comment-preserving config writes    │ │
+│  │  export.ts     JSON builder · docx npm · PDF via hidden BrowserWindow     │ │
+│  │  evalset.ts    eval-sets/ JSON CRUD (list / load / save / delete)         │ │
+│  │  outputs.ts    reads output/*_run_config.json for per-stage token data    │ │
+│  │  lint.ts       Layer-1 linter via Python sidecar (--json flag)            │ │
+│  │  paths.ts      resolvePython(): MCQ_PYTHON env → .venv → PATH            │ │
+│  └──────────────────────────────────────┬────────────────────────────────── ┘ │
+│                                          │ spawn(python -m mcq_agent.cli)      │
+│  ┌───────────────────────────────────────▼────────────────────────────────── ┐ │
+│  │  Python Sidecar  (mcq_agent.cli --json-events)                            │ │
+│  │                                                                             │ │
+│  │  NDJSON event stream on stdout → readline → ipcRenderer 'pipeline:event'  │ │
+│  │  Events: stage_start · stage_done · question_accepted · question_rejected  │ │
+│  │           run_complete · error · linter_result                             │ │
+│  └─────────────────────────────────────────────────────────────────────────── ┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.4 Two-Store Data Architecture
+
+```
+                         Python Pipeline writes
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────┐
+│             logs/runs.db  (SQLite — audit log)            │
+│                                                           │
+│  runs          ─ every pipeline execution, config snap   │
+│  mcqs          ─ ALL questions: accepted (passed=1)       │
+│                  AND rejected (passed=0) with critique    │
+│  concept_maps  ─ MD5-keyed ConceptMap cache              │
+│                                                           │
+│  GUI reads via sql.js WASM (no native build needed)       │
+│  Python owns all writes; GUI reads are snapshot-safe      │
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                   supabase_gate.py (optional)
+                   ┌─────────┴────────────────┐
+                   │  1. Fetch all existing    │
+                   │  2. token_set_ratio dedup │
+                   │  3. Renumber survivors    │
+                   │  4. Idempotent push       │
+                   └─────────┬────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────┐
+│            Supabase  (cloud — optional)                   │
+│                                                           │
+│  Only accepted + deduplicated questions                   │
+│  Gapless sequential question_number                       │
+│  Promoted columns: difficulty · bloom_level · source      │
+│  v_questions view for fast navigation queries             │
+└───────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 3. Environment Setup (from scratch)
+## 3. Environment Setup
 
 ### 3.1 Prerequisites
 
-| Requirement | Notes |
-|-------------|-------|
-| Python 3.10+ | Check: `python --version` |
-| pip | Bundled with Python 3.10+ |
-| At least one API key | OpenRouter recommended (one key, all models) |
+**Python stack (required for both CLI and GUI):**
 
-Get API keys at:
-- **OpenRouter** (recommended): https://openrouter.ai/keys
-- **Groq** (free tier): https://console.groq.com/keys
-- **Anthropic**: https://console.anthropic.com
+| Requirement | Notes |
+|---|---|
+| Python 3.10+ | `python --version` |
+| pip | Bundled with Python 3.10+ |
+| At least one LLM API key | OpenRouter recommended |
+
+**GUI stack (required only to run the Electron desktop app):**
+
+| Requirement | Version | Check |
+|---|---|---|
+| Node.js | 18 LTS or 20 LTS | `node --version` |
+| npm | 9+ (bundled with Node 18) | `npm --version` |
+
+API keys: [OpenRouter](https://openrouter.ai/keys) · [Groq](https://console.groq.com/keys) · [Anthropic](https://console.anthropic.com)
 
 ---
 
-### 3.2 Create the virtual environment
+### 3.2 Python Environment
 
 **Recommended — run the setup script:**
 
@@ -236,39 +346,26 @@ Both scripts do the following automatically (safe to re-run):
 **Manual alternative:**
 
 ```powershell
-# 1. Create venv
 python -m venv .venv
-
-# 2. Activate
 .\.venv\Scripts\Activate.ps1          # PowerShell
-# OR: .\.venv\Scripts\activate.bat    # Command Prompt
-
-# 3. Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
-
-# 4. Install the CLI
 pip install -e .
-
-# 5. Create directories
 New-Item -ItemType Directory -Force output, logs
-
-# 6. Run smoke tests
 python -m pytest tests/ -v
 ```
 
-**Activate the environment at the start of every session:**
+**Activate at the start of every Python session:**
 
 ```powershell
 .\.venv\Scripts\Activate.ps1       # PowerShell — prompt shows (.venv)
-.\.venv\Scripts\activate.bat       # Command Prompt
 ```
 
 ---
 
-### 3.3 Configure API keys (.env)
+### 3.3 API Keys (.env)
 
-If the setup script ran, `.env` already exists (copied from `.env.example`). Open it and fill in the key for your provider:
+Open `.env` (created by setup script from `.env.example`) and fill in the key for your provider:
 
 ```env
 # OpenRouter (current default — one key for all models):
@@ -285,84 +382,155 @@ SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_KEY=eyJhbGci...   # Secret (service_role) key — NOT the anon key
 ```
 
-You only need the key for the `provider:` value currently set in `config.yaml`. Leave other lines as placeholders.
+You only need the key for the `provider:` value currently set in `config.yaml`.
 
 ---
 
-### 3.4 Verify the install
+### 3.4 GUI Setup (Node.js)
+
+The GUI is a separate Node project in `gui/`. It requires Node.js 18 or 20 LTS.
 
 ```powershell
-# Check CLI is registered
+cd gui
+npm install
+```
+
+That's it — no further build step needed for development. The `npm run dev` command below handles the rest.
+
+> **Windows extract quirk:** If Electron's installer silently fails mid-extract (leaving only `LICENSES.chromium.html`), fix it without re-downloading:
+>
+> ```powershell
+> $zip = Get-ChildItem "$env:LOCALAPPDATA\electron\Cache" -Recurse -Filter *.zip | Select -First 1
+> Remove-Item -Recurse -Force node_modules\electron\dist
+> Expand-Archive $zip.FullName node_modules\electron\dist -Force
+> Set-Content node_modules\electron\path.txt "electron.exe" -NoNewline -Encoding ascii
+> ```
+
+The GUI resolves Python automatically via `paths.ts`:
+1. `MCQ_PYTHON` environment variable (if set)
+2. `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix) inside the repo root
+3. `python` on `PATH` as fallback
+
+**You do not need to activate the Python venv before launching the GUI** — as long as `.venv/` exists in the repo root, the GUI finds it automatically.
+
+---
+
+### 3.5 Verify the Install
+
+```powershell
+# Python CLI
 mcq-agent --help
-
-# Check config loads cleanly
-python -c "from mcq_agent.config import load_config; s = load_config(); print('Config OK:', s.model)"
-
-# Run offline smoke tests (no API calls)
-python -m pytest tests/ -v
-
-# Quick generation test
+python -m pytest tests/ -v          # 5 smoke tests, no API calls
 mcq-agent generate examples/sample_lesson.md --count 3
+
+# GUI
+cd gui
+node -e "console.log(require('electron'))"   # should print the exe path
+npm run build                                  # TypeScript + Vite build check
 ```
 
 ---
 
-## 4. Configuration Reference (config.yaml)
+## 4. Running the Application
 
-All runtime settings live in `config.yaml` in the project root. Changes take effect immediately on the next run — no restart needed.
+### 4.1 CLI
+
+```powershell
+# Activate venv first
+.\.venv\Scripts\Activate.ps1
+
+# Generate questions from a Markdown file
+mcq-agent generate path/to/lesson.md
+
+# Common options
+mcq-agent generate lesson.md --count 20 --difficulty hard
+mcq-agent generate lesson.md --count 10 --topic "MQTT Protocol"
+mcq-agent generate lesson.md --config configs/groq_config.yaml
+
+# View history
+mcq-agent list-runs
+mcq-agent list-runs --limit 5
+
+# Inspect a run
+mcq-agent show-run <run-uuid>
+mcq-agent show-run <first-8-chars>     # short ID works
+
+# Push to Supabase cloud (requires enable_supabase: true + keys in .env)
+mcq-agent push-supabase --latest
+mcq-agent push-supabase --latest --dry-run
+```
+
+Output is written to `output/` (4 files per run — see [§13 Output Files](#13-output-files)).
+
+---
+
+### 4.2 Electron GUI
+
+```powershell
+cd gui
+
+# Development (hot-reload Vite + Electron)
+npm run dev
+# Opens the Electron window automatically.
+# Edit any src/ file → Vite HMR reloads the renderer without restarting.
+
+# Production build
+npm run build
+# Outputs: gui/dist/ (renderer) + gui/dist-electron/ (main process)
+# Run with: npx electron .   (from gui/ directory)
+```
+
+**What the GUI requires at runtime:**
+- `logs/runs.db` — SQLite database (auto-created by the Python pipeline on first run)
+- `config.yaml` — pipeline configuration (at the repo root)
+- `.venv/` — Python virtual environment for the sidecar
+- `output/` — pipeline output files (for per-stage token data in Dashboard)
+- `eval-sets/` — eval set JSON files (auto-created by the GUI on first use)
+
+The status bar at the bottom of every screen shows the current DB row counts, model routing, and session cost. If the DB doesn't exist yet (`logs/runs.db` missing), the GUI shows a setup hint.
+
+---
+
+## 5. Configuration Reference (config.yaml)
+
+All runtime settings live in `config.yaml` in the project root. Changes take effect immediately on the next run — no restart needed. The **Model tab** in the GUI provides a graphical editor for this file with live validation and comment-preserving writes.
 
 ```yaml
 # ── LLM Provider ──────────────────────────────────────────────────────────
-# Global fallback — used for any stage that doesn't have an override.
 provider: openrouter           # anthropic | groq | openrouter
 model: google/gemini-2.5-flash
 
-# Per-stage overrides. Set any to null to fall back to the global model.
-# Analyzer runs ONCE then is cached — use your best model here.
+# Per-stage overrides. null → falls back to global model.
 analyzer_provider: openrouter
 analyzer_model: google/gemini-2.5-flash
-
 generator_provider: openrouter
 generator_model: google/gemini-2.5-flash
-
 critic_provider: openrouter
 critic_model: google/gemini-2.5-flash
 
 # ── Question Generation ────────────────────────────────────────────────────
-num_questions: 10              # Target number of accepted questions
+num_questions: 10              # Target accepted questions
 difficulty: medium             # easy | medium | hard | expert
 question_type: single_correct  # single_correct | ordering | code_snippet
 num_options: 4                 # Options per question (3–6)
-
-# Generates 2× the target so the critic can filter down without running out.
-over_generation_factor: 2.0
-
-# Allow mix of single_correct, ordering, and code_snippet types.
-mixed_question_types: true
+over_generation_factor: 2.0    # Generate 2× the target for the critic to filter
+mixed_question_types: true     # Mix single_correct, ordering, code_snippet
 
 # ── Quality Control ────────────────────────────────────────────────────────
-# Fuzzy-match ratio for source_excerpt vs document (0–1).
-# Large documents with T2 truncation typically score 0.65–0.75.
-# Lowering to 0.55–0.60 helps if all questions fail on first pass.
-source_grounding_threshold: 0.65
-
-# How many full Generator+Critic loops to run before giving up.
-# Each loop asks only for the remaining deficit (e.g. if 7/10 passed, asks for 3 more).
-guarantee_n_retries: 20
+source_grounding_threshold: 0.65   # fuzzy-match ratio (0–1)
+guarantee_n_retries: 20            # full Generator+Critic loops before giving up
 
 # ── Token Budgets Per Stage ────────────────────────────────────────────────
-max_tokens: 32000              # Generator output budget
-critic_max_tokens: 4000        # Critic output budget (per MCQ evaluation)
-analyzer_max_tokens: 20000     # Analyzer output budget
+max_tokens: 32000
+critic_max_tokens: 4000
+analyzer_max_tokens: 20000
 
 # ── LLM Temperatures ──────────────────────────────────────────────────────
-temperature: 0.7               # Generator — fallback when no Bloom level applies
-critic_temperature: 0.2        # Critic — strict, deterministic evaluation
-analyzer_temperature: 0.2      # Analyzer — deterministic concept extraction
+temperature: 0.7               # Generator fallback
+critic_temperature: 0.2
+analyzer_temperature: 0.2
 
-# Per-Bloom-level generation temperature. The Generator makes one call per Bloom
-# level the source supports, each at the temperature below (lower = more
-# constrained recall, higher = more creative synthesis). See Stage 2 — Generate.
+# Per-Bloom-level temperatures for the Generator fan-out
 bloom_temperatures:
   remember: 0.5
   understand: 0.6
@@ -376,26 +544,24 @@ linter_min_words: 300
 linter_min_sections: 2
 linter_min_words_per_section: 50
 linter_min_concept_density: 0.3
-linter_fail_on_warn: false     # Set to true to abort on any WARN (stricter)
+linter_fail_on_warn: false
 
 # ── Retry / Rate Limit ────────────────────────────────────────────────────
 api_max_retries: 3
 api_retry_initial_backoff: 2.0
 
-# ── Pricing (for cost reporting only — does not affect generation) ─────────
+# ── Pricing (for cost reporting only) ─────────────────────────────────────
 pricing:
-  input_per_million_tokens: 0.15     # google/gemini-2.5-flash via OpenRouter
+  input_per_million_tokens: 0.15
   output_per_million_tokens: 0.60
-
 generator_pricing:
   input_per_million_tokens: 0.15
   output_per_million_tokens: 0.60
-
 critic_pricing:
   input_per_million_tokens: 0.15
   output_per_million_tokens: 0.60
 
-# ── Cloud Storage (Supabase) ──────────────────────────────────────────────
+# ── Cloud Storage ─────────────────────────────────────────────────────────
 enable_supabase: false
 supabase_similarity_threshold: 80  # 0–100; lower = stricter dedup
 
@@ -411,78 +577,49 @@ few_shot_examples_file: prompts/few_shot_examples.json
 
 **Common config adjustments:**
 
-| Goal | What to change |
-|------|---------------|
-| Generate more questions | `num_questions: 50`; also raise `guarantee_n_retries` |
-| Fewer questions fail grounding | Lower `source_grounding_threshold` to `0.55–0.60` |
-| Use premium model only for Analyzer | `analyzer_model: anthropic/claude-opus-4-7` |
-| Switch to Groq provider | Change all `*_provider` to `groq`, all `*_model` to a Groq model ID |
-| Stricter duplicate filtering | Lower `supabase_similarity_threshold` to `70` |
-| Pipeline exits before reaching target | Raise `guarantee_n_retries` to `30` |
+| Goal | Change |
+|---|---|
+| More questions | `num_questions: 50`; raise `guarantee_n_retries` |
+| Fewer grounding failures | Lower `source_grounding_threshold` to `0.55–0.60` |
+| Premium Analyzer only | `analyzer_model: anthropic/claude-opus-4-8` |
+| Switch to Groq | Change all `*_provider` to `groq`, update model IDs |
+| Stricter dedup | Lower `supabase_similarity_threshold` to `70` |
 
 ---
 
-## 5. LLM Providers
+## 6. LLM Providers
 
-Three providers are supported. Switch by editing `provider:` and the matching `*_provider` fields in `config.yaml`, plus the corresponding key in `.env`.
-
-| Provider | Env var | Model format | Example model | Cost |
-|----------|---------|-------------|---------------|------|
+| Provider | Env var | Model format | Example | Cost |
+|---|---|---|---|---|
 | OpenRouter | `OPENROUTER_API_KEY` | `provider/model-name` | `google/gemini-2.5-flash` | Very cheap |
-| Groq | `GROQ_API_KEY` | plain model ID | `llama-3.3-70b-versatile` | Free tier available |
-| Anthropic | `ANTHROPIC_API_KEY` | plain model ID | `claude-sonnet-4-6` | Medium cost |
+| Groq | `GROQ_API_KEY` | plain model ID | `llama-3.3-70b-versatile` | Free tier |
+| Anthropic | `ANTHROPIC_API_KEY` | plain model ID | `claude-sonnet-4-6` | Medium |
 
-**OpenRouter advantage:** One API key gives access to hundreds of models — Gemini, Claude, GPT-4o, Llama, Mistral, and more. Use it to switch models without creating new accounts.
+**OpenRouter** gives access to hundreds of models under one key — Gemini, Claude, GPT-4o, Llama, Mistral. Recommended for production.
 
-**Current production config:** OpenRouter → `google/gemini-2.5-flash` for all stages.
+### Model selection guide
 
-### Model selection guide per stage
+| Stage | Priority | Recommended |
+|---|---|---|
+| Analyzer | Quality > Speed > Cost — runs once, cached | `claude-opus-4-8`, `gpt-4o`, `gemini-2.5-flash` |
+| Generator | Quality + instruction-following | `gemini-2.5-flash`, `llama-4-scout`, `claude-sonnet-4-6` |
+| Critic | Speed > Cost — runs once per MCQ | `llama-3.1-8b-instant`, `gemini-2.5-flash` |
 
-| Stage | Priority | Recommended models |
-|-------|---------|-------------------|
-| Analyzer | Quality > Speed > Cost — runs once, cached | `anthropic/claude-opus-4-7`, `openai/gpt-4o`, `google/gemini-2.5-flash` |
-| Generator | Quality + instruction-following | `google/gemini-2.5-flash`, `meta-llama/llama-4-scout-17b-16e-instruct`, `claude-sonnet-4-6` |
-| Critic | Speed > Cost > Quality — runs once per MCQ | `llama-3.1-8b-instant`, `claude-haiku-4-5`, `google/gemini-2.5-flash` |
-
-### Provider comparison for this workload
-
-| Aspect | Groq Llama 3.3 70B | Anthropic Claude Sonnet | Google Gemini 2.5 Flash |
-|--------|-------------------|------------------------|------------------------|
-| Cost / 1M in | ~$0.59 | ~$3.00 | ~$0.15 |
-| Cost / 1M out | ~$0.79 | ~$15.00 | ~$0.60 |
-| Speed | Very fast | Standard | Fast |
-| JSON reliability | Strong | Excellent | Strong |
-| Best for | Development + bulk | HARD/EXPERT difficulty | Production default |
-
-### Example: all-Groq config (free tier)
-
-```yaml
-provider: groq
-model: llama-3.3-70b-versatile
-analyzer_provider: groq
-analyzer_model: llama-3.3-70b-versatile
-generator_provider: groq
-generator_model: meta-llama/llama-4-scout-17b-16e-instruct
-critic_provider: groq
-critic_model: llama-3.1-8b-instant
-```
-
-### Example: mixed-provider config (cost-optimised)
+### Example: cost-optimised mixed config
 
 ```yaml
 provider: openrouter
-model: google/gemini-2.5-flash
-analyzer_provider: anthropic           # premium for concept extraction (runs once)
-analyzer_model: claude-opus-4-7
-generator_provider: openrouter          # cheap for bulk generation
+analyzer_provider: anthropic
+analyzer_model: claude-opus-4-8       # premium once, then cached
+generator_provider: openrouter
 generator_model: google/gemini-2.5-flash
-critic_provider: groq                   # fastest for per-MCQ eval
-critic_model: llama-3.1-8b-instant
+critic_provider: groq
+critic_model: llama-3.1-8b-instant    # fastest for per-MCQ eval
 ```
 
 ---
 
-## 6. The Pipeline — Stage by Stage
+## 7. The Pipeline — Stage by Stage
 
 ### Stage 0 — Parse
 
@@ -491,8 +628,8 @@ critic_model: llama-3.1-8b-instant
 Reads the `.md` file once and builds all three document tiers:
 
 - **T1 `raw_text`** — verbatim file content. Only the Analyzer uses this.
-- **T2 `section_summaries`** — first 3 sentences of prose + all code blocks per section. Reduces token count by 40–70% vs T1. Generator and Reframer use this.
-- **T3 `section_fingerprints`** — section heading + top-20 key terms (stop-words removed). The Critic uses this to locate the relevant section without reading the full document.
+- **T2 `section_summaries`** — first 3 sentences of prose + all code blocks per section. ~30–60% of T1 tokens. Generator and Reframer use this.
+- **T3 `section_fingerprints`** — section heading + top-20 key terms (stop-words removed). ~5–10% of T1. Critic source-slicing uses this.
 
 The parser also extracts section hierarchy, tables, and code blocks for structural metadata.
 
@@ -502,19 +639,13 @@ The parser also extracts section hierarchy, tables, and code blocks for structur
 
 **File:** `mcq_agent/analyzer.py`
 
-Sends T1 (full document) to the LLM and extracts a `ConceptMap` — a structured knowledge graph of the lesson.
+Sends T1 (full document) to the LLM and extracts a `ConceptMap` — a structured knowledge graph.
 
-A `ConceptMap` contains:
-- **Concepts** — each enriched with testability score (1–5), difficulty range, question templates, prerequisite concepts, and confusion pairs (used by Reframer for distractor replacement)
-- **Procedures** — step-by-step workflows with decision points and failure modes
-- **Technical Facts** — discrete verifiable statements anchored to section headings
-- **Code Examples** — code snippets with line-by-line annotations and testable behaviours
-- **Thematic Clusters** — groups of related concepts across sections
-- **Prerequisite Chains** — ordered learning sequences from foundational to advanced
+**Caching:** Computes the MD5 hash of the source file, queries SQLite `concept_maps` table. Cache hit → instant return at zero token cost. Cache is permanent — run against the same file a hundred times, pay the LLM once.
 
-**Caching:** Before calling the LLM, the Analyzer computes the MD5 hash of the source file and queries SQLite. If the file hasn't changed, the cached `ConceptMap` is returned instantly at zero token cost. The cache is permanent — run against the same file a hundred times, pay the LLM once.
+**Temperature:** 0.2 — deterministic extraction.
 
-**Temperature:** 0.2 — deterministic extraction, not creative.
+A `ConceptMap` contains concepts (with testability score 1–5, confusion pairs for distractor replacement), procedures, technical facts, code examples, thematic clusters, and prerequisite chains.
 
 ---
 
@@ -522,28 +653,13 @@ A `ConceptMap` contains:
 
 **File:** `mcq_agent/generator.py`
 
-Takes T2 summaries + a compact serialisation of the `ConceptMap` (sorted by testability score) and generates MCQ candidates.
+Takes T2 + compact `ConceptMap` (sorted by testability score) and generates MCQ candidates.
 
-Each candidate `MCQ` includes:
-- Question stem
-- 4 options (A/B/C/D), each with `is_correct`, `text`, and `distractor_rationale`
-- `explanation` (the correct reasoning, must explain why distractors are wrong)
-- `source_excerpt` (verbatim quote from the document supporting the answer)
-- `bloom_level`, `difficulty`, `question_type`, `stem_pattern`
+**Per-Bloom fan-out:** Generation fans across every Bloom level the source actually supports (union of all concepts' `supported_bloom_levels`). Each level gets its own LLM call at its own temperature from `bloom_temperatures`. The target question count is split evenly across active levels; any remainder goes to levels backed by the most concepts. Sources with no declared Bloom levels fall back to a single call at the global `temperature`.
 
-Key generation behaviours:
-- **Per-Bloom multi-call:** generation fans out across the Bloom levels the source actually supports (the union of every concept's `supported_bloom_levels`). Each level gets its **own** Generator call at its own temperature from `bloom_temperatures` — so a `remember` batch runs at 0.5 (constrained recall) while a `create` batch runs at 0.9 (creative synthesis). The run's question target is split evenly across active levels each retry attempt, with any remainder handed to the levels backed by the most concepts. A source whose concepts declare no Bloom levels falls back to a single flat-temperature call (`temperature`).
-- **Over-generation:** generates `num_questions × over_generation_factor` candidates to account for critic rejections
-- **Mixed types:** with `mixed_question_types: true`, distributes across `single_correct`, `ordering` (step-sequencing), and `code_snippet` types. The `ordering`/`code_snippet` hints are suppressed for `remember`/`understand` batches, where those higher-order formats don't fit.
-- **Batch processing:** chunks large concept maps to stay within token budgets
-- **Position bias fix:** prompted to distribute correct answers across A/B/C/D evenly (a post-generation shuffle in `validators.py` enforces this mechanically)
+**Mixed types:** With `mixed_question_types: true`, distributes across `single_correct`, `ordering`, and `code_snippet`. Higher-order type hints are suppressed for `remember`/`understand` batches where they don't fit.
 
-**Quality rules enforced in the generator prompt:**
-- **Stem economy (#9):** only include context that bears on the question — no defensive over-specification
-- **Source-phrase independence (#10):** correct answer must paraphrase, not echo, the source excerpt
-- **Option length parity (#11):** correct answer must stay within ±20% of median distractor length; expand distractors rather than trimming the correct answer
-
-**Temperature:** per Bloom level (see `bloom_temperatures` above); `temperature: 0.7` is the fallback when the source declares no Bloom levels.
+Each candidate includes: question stem, 4 options with `is_correct` + `distractor_rationale`, `explanation`, `source_excerpt`, `source_heading`, `bloom_level`, `difficulty`, `question_type`, `stem_pattern`.
 
 ---
 
@@ -551,38 +667,27 @@ Key generation behaviours:
 
 **File:** `mcq_agent/critic.py`
 
-Evaluates each candidate MCQ independently. The Critic does NOT see other candidates — each is judged in isolation.
+Each MCQ is evaluated independently. The Critic does NOT see other candidates.
 
-**Source slicing (avoids sending the full document every time):**
+**Source slicing** (avoids sending the full document): finds the relevant section via T3 fingerprints — first by `source_heading` substring match, then by `source_excerpt` prefix match, then by `rapidfuzz.partial_ratio` against key terms. No full-document fallback — if no match, the question fails automatically.
 
-The Critic finds the relevant source section using T3 fingerprints in priority order:
-1. Case-insensitive substring match of the MCQ's `source_heading` against section headings
-2. Match of the first 60 characters of `source_excerpt` against section content
-3. `rapidfuzz.partial_ratio` scoring of the question text against each section's T3 key terms — sends the highest-scoring section
-
-There is **no full-document fallback** — if none of the three methods finds a match, the question fails automatically. This prevents the Critic from wasting tokens and ensures it always judges against the right source material.
-
-**The 13 quality criteria evaluated:**
+**The 13 quality criteria:**
 
 | # | Criterion |
-|---|-----------|
+|---|---|
 | a | Source grounding (excerpt matches document) |
-| b | Unique correct answer (for single_correct type) |
-| c | Factual accuracy of correct answer |
-| d | Distractor plausibility (wrong but not absurd) |
-| e | Stem clarity (question is unambiguous) |
+| b | Unique correct answer |
+| c | Factual accuracy |
+| d | Distractor plausibility |
+| e | Stem clarity |
 | f | Bloom level matches declared difficulty |
-| g | Explanation quality (teaches why correct; addresses distractors) |
+| g | Explanation quality |
 | h | Source heading accuracy |
 | i | Stem economy (no non-load-bearing context) |
-| j | Option length parity (correct answer not much longer than distractors) |
-| k | Source-phrase independence (correct answer doesn't echo excerpt verbatim) |
-| l | Distractor rationale present for all incorrect options |
-| m | No option can be immediately eliminated as absurd |
-
-Questions where `passes=True` move to the accepted list. Failures go to the Reframer.
-
-**Temperature:** 0.2 — strict, deterministic evaluation.
+| j | Option length parity |
+| k | Source-phrase independence |
+| l | Distractor rationale present for all wrong options |
+| m | No option immediately eliminable as absurd |
 
 ---
 
@@ -590,387 +695,264 @@ Questions where `passes=True` move to the accepted list. Failures go to the Refr
 
 **File:** `mcq_agent/reframer.py`
 
-When a question fails the Critic, the Reframer classifies the failure and applies the minimum intervention rather than discarding the question entirely.
-
-**Failure class taxonomy:**
+Classifies the failure and applies the minimum intervention rather than discarding the question.
 
 | Class | Failure | Fix |
-|-------|---------|-----|
-| A | `length_parity` — correct answer is >30% longer than median distractor | Expand distractors using ConceptMap `confusion_pairs` |
-| B | `source_excerpt` doesn't match the document | Re-ground: find a verbatim excerpt from the relevant source section |
-| C | Distractors are implausible or not grounded | Replace weak distractors using ConceptMap `confusion_pairs` |
-| D | Correct answer contains unsourced claims | Trim correct answer to only source-supported content |
-| E | Both B and A fail | Fix B (re-grounding) first, then A (length parity) |
-| SKIP | Structural failure: wrong option count, duplicate options, uniqueness | Not reframeable — stays rejected |
+|---|---|---|
+| A | Length parity — correct answer >30% longer | Expand distractors using ConceptMap confusion pairs |
+| B | Source excerpt doesn't match document | Re-ground: find verbatim excerpt from source section |
+| C | Distractors implausible or ungrounded | Replace using ConceptMap confusion pairs |
+| D | Correct answer contains unsourced claims | Trim to source-supported content only |
+| E | Both B and A fail | Fix B first, then A |
+| SKIP | Structural failure (option count, duplicates) | Not reframeable — rejected |
 
-After the fix, the reframed MCQ goes through validators and the Critic again. If it passes both, it joins the accepted list. If it fails again, it is rejected.
+After fix: re-validates + re-critiques. Pass → accepted. Fail again → rejected.
 
 ---
 
 ### Quality Gates
 
-**Validators (`mcq_agent/validators.py`) — run before the Critic, free, deterministic:**
-
-All 7 checks run on every candidate — no short-circuit — so you always see the full failure picture.
+**Validators (`validators.py`) — 7 deterministic checks, all run (no short-circuit):**
 
 | # | Check | What it catches |
-|---|-------|----------------|
-| 1 | `source_grounding` | `source_excerpt` fuzzy-match score vs document < threshold |
-| 2 | `uniqueness` | Correct option count doesn't match question type |
-| 3 | `option_count` | Number of options doesn't match `num_options` config |
-| 4 | `distractor_rationales` | Any incorrect option missing `distractor_rationale` |
-| 5 | `bloom_difficulty_alignment` | Bloom level inconsistent with difficulty level |
-| 6 | `length_parity` | Correct answer >30% longer than median distractor |
-| 7 | `source_phrase_overlap` | Correct answer reproduces a 5-gram verbatim from `source_excerpt` |
+|---|---|---|
+| 1 | `source_grounding` | fuzzy-match score < threshold |
+| 2 | `uniqueness` | wrong correct option count |
+| 3 | `option_count` | doesn't match `num_options` |
+| 4 | `distractor_rationales` | missing rationale on any wrong option |
+| 5 | `bloom_difficulty_alignment` | Bloom inconsistent with difficulty |
+| 6 | `length_parity` | correct answer >30% longer than median distractor |
+| 7 | `source_phrase_overlap` | 5-gram verbatim copy from excerpt |
 
-A utility `shuffle_correct_answer_positions()` runs after generation to randomly reassign A/B/C/D labels, mechanically removing the LLM's built-in B/C position bias.
+`shuffle_correct_answer_positions()` randomly reassigns A/B/C/D labels after generation — eliminates LLM position bias mechanically.
 
-**Source Linter (`mcq_agent/source_linter.py`) — runs before any API call:**
+**Source Linter (`source_linter.py`) — Layer 1 (static) + Layer 2 (post-Analyzer):**
 
-*Layer 1 — static checks (word count, section density):*
-
-| Check | PASS | WARN | FAIL |
-|-------|------|------|------|
-| `word_count` | ≥ min_words | ≥ 60% of min | < 60% of min |
-| `section_count` | ≥ min_sections | < min_sections | — |
-| `thin_sections` | none thin | some thin | — |
-| `code_blocks` | ≥ 1 | 0 | — |
-| `term_density` | ≥ 0.5% | < 0.5% | — |
-
-*Layer 2 — concept density checks (runs after Analyzer, uses its output, no extra API cost):*
-
-| Check | PASS | WARN | FAIL |
-|-------|------|------|------|
-| `concept_density` | ≥ threshold | ≥ 60% of threshold | < 60% |
-| `procedural_richness` | ≥ 1 procedure | 0 procedures | — |
-| `technical_facts` | ≥ 3 facts | 1–2 facts | 0 facts |
-
-A `FAIL` aborts the run immediately before spending further API tokens. A `WARN` continues unless `linter_fail_on_warn: true` in config.
-
-Results are saved to `output/<label>_source_quality.json`.
+FAIL on any check aborts the run before spending further tokens. WARN continues unless `linter_fail_on_warn: true`.
 
 ---
 
 ### Guarantee-N Retry Loop
 
-The pipeline runs Generator → Validators → Critic → Reframer in a loop until either:
+Runs Generator → Validators → Critic → Reframer in a loop until:
 - `accepted_count >= num_questions`, **or**
-- `guarantee_n_retries` iterations are exhausted
+- `guarantee_n_retries` iterations exhausted
 
-Each loop iteration asks only for the remaining deficit: if 7/10 questions have been accepted, the next batch requests 3. This means a run configured for 10 questions always tries to deliver exactly 10, regardless of how many candidates get rejected along the way.
-
----
-
-## 7. Storage: SQLite + Supabase
-
-### 7.1 SQLite (local — always active)
-
-**Location:** `logs/runs.db` (auto-created on first run)
-**Module:** `mcq_agent/storage.py`
-
-Three tables:
-
-**`runs`** — one row per pipeline execution:
-```
-run_id              TEXT PRIMARY KEY    UUID
-timestamp           TEXT                ISO datetime
-input_file          TEXT                path to source .md
-config_json         TEXT                full settings snapshot
-generated_count     INTEGER
-passed_count        INTEGER
-total_input_tokens  INTEGER
-total_output_tokens INTEGER
-cost_usd            REAL
-generation_number   INTEGER             sequential run counter (1, 2, 3 …)
-```
-
-**`mcqs`** — one row per question (both accepted and rejected):
-```
-id              INTEGER PRIMARY KEY AUTOINCREMENT
-run_id          TEXT    REFERENCES runs(run_id)
-mcq_json        TEXT    full MCQ as JSON
-passed          INTEGER 1 = accepted, 0 = rejected
-critique_json   TEXT    Critic result JSON
-question_number INTEGER NULL for rejected; global sequential number for accepted
-```
-
-**`concept_maps`** — Analyzer cache:
-```
-file_hash           TEXT PRIMARY KEY   MD5 of source file content
-source_file         TEXT
-analyzer_model      TEXT
-created_at          TEXT               ISO datetime
-concept_map_json    TEXT               full ConceptMap as JSON
-```
-
-**Key functions in `storage.py`:**
-- `init_db(db_path)` — creates tables; runs migrations for older DBs
-- `log_run(run, db_path)` — persists a completed PipelineRun
-- `get_run(run_id, db_path)` — reconstructs a PipelineRun from the DB
-- `list_recent_runs(db_path, limit)` — lightweight summary rows for the CLI
-- `get_total_accepted_count(db_path)` — used to assign the next `question_number`
-- `get_run_count(db_path)` — used to assign the `generation_number`
-
-**Useful raw SQLite commands:**
-
-```powershell
-# List all runs
-sqlite3 logs/runs.db "SELECT run_id, timestamp, passed_count, cost_usd FROM runs;"
-
-# Check what's in the concept map cache
-sqlite3 logs/runs.db "SELECT source_file, analyzer_model, created_at FROM concept_maps;"
-
-# Count all accepted questions
-sqlite3 logs/runs.db "SELECT COUNT(*) FROM mcqs WHERE passed=1;"
-
-# Clear concept map cache (forces re-analysis on next run)
-sqlite3 logs/runs.db "DELETE FROM concept_maps;"
-
-# Clear cache for one file only
-sqlite3 logs/runs.db "DELETE FROM concept_maps WHERE source_file LIKE '%my_lesson%';"
-```
+Each iteration requests only the remaining **deficit** — if 7/10 passed, asks for 3 more. Always tries to hit the target exactly.
 
 ---
 
-### 7.2 Concept Map Cache
+## 8. Storage: SQLite + Supabase
 
-The Analyzer is the most expensive LLM call (premium model, full document). The cache eliminates this cost on every run after the first.
+### SQLite (local — always active)
 
-**How it works:**
+**Location:** `logs/runs.db` · **Module:** `mcq_agent/storage.py`
 
-1. Compute MD5 hash of the source file content
-2. Query `concept_maps` table: `SELECT … WHERE file_hash = '<hash>'`
-3. **Cache hit** → return the stored ConceptMap instantly. Token cost = 0. Logs `analyzer_cache_hit`.
-4. **Cache miss** → call the LLM, save result with `INSERT OR REPLACE`
-
-**Why MD5 of content (not file path):** The same content always hits the cache regardless of whether you renamed or moved the file. If you edit the file (even a typo fix), the MD5 changes → cache miss → fresh Analyzer run.
-
----
-
-### 7.3 Supabase (cloud — optional)
-
-**Purpose:** A clean, deduplicated cloud question bank for use by an internal application. Unlike SQLite (which stores everything including test runs and rejected questions), Supabase stores only accepted, deduplicated questions with gapless sequential numbering.
-
-**Complete setup guide:** `SUPABASE_SETUP.txt` — contains all SQL to run, step-by-step instructions, query examples, and troubleshooting. Anyone setting up or managing the database should start there.
-
-**Schema:** `supabase_schema.sql` (v2) — for fresh projects only. Upgrading from v1 uses the migration block in `SUPABASE_SETUP.txt`.
-
-**First-time setup (summary):**
-
-1. Go to https://supabase.com → create a free project
-2. In the dashboard: **SQL Editor** → **New query** → paste `supabase_schema.sql` → **Run**
-3. **Project Settings** → **Data API** tab → copy **Project URL** → `SUPABASE_URL` in `.env`
-4. **Project Settings** → **API Keys** tab → copy **Secret (service_role)** key → `SUPABASE_KEY` in `.env`
-   - Use the Secret key, **NOT** the Publishable (anon) key — the anon key is blocked by Row Level Security and causes a 403 error
-5. In `config.yaml`: set `enable_supabase: true`
-
-**Verification:**
-
-```powershell
-python migrate_to_supabase.py --latest --dry-run
-```
-
-**Schema v2 additions (navigation layer):**
-
-| Table/Column | Purpose |
+| Table | Key columns |
 |---|---|
-| `runs.generation_label` | Auto-derived timestamp label `YYYYMMDD-HHMM` (e.g. `20260604-1423`) |
-| `runs.topic` | Human-readable lesson topic set via `--topic` CLI flag |
-| `runs.source_lesson` | Filename stem of the source `.md` file |
-| `run_tags` table | Extensible key-value tags per run (`course`, `unit`, `week`, `cohort`, …) |
-| `mcqs.difficulty` | Promoted from `mcq_json` — indexed for fast filtering |
-| `mcqs.bloom_level` | Promoted from `mcq_json` — indexed |
-| `mcqs.question_type` | Promoted from `mcq_json` — indexed |
-| `mcqs.stem_pattern` | Promoted from `mcq_json` — indexed |
-| `mcqs.source_heading` | Promoted from `mcq_json` — indexed |
-| `mcqs.quality_score` | 0–100; 100 for accepted, computed from 12 Critic criteria for rejected |
-| `mcq_tags` table | Per-question override tags (use sparingly; most tags belong on the run) |
-| `v_questions` view | Join surface — navigation columns + `mcq_json` in one row |
-
-The `mcq_json` blob is **never modified**. All new columns sit beside it.
-
----
-
-### 7.4 Deduplication Algorithm
-
-**Module:** `mcq_agent/similarity.py`, `mcq_agent/supabase_gate.py`
-
-The gate runs automatically at the end of each pipeline run when Supabase is enabled, or manually via `check_similarity.py`.
-
-**Algorithm:**
-
-1. Fetch all accepted questions from Supabase (paginated in batches of 1000)
-2. For each new question, compute composite text: question stem + all option texts (including distractors)
-3. Score with `rapidfuzz.fuzz.token_set_ratio` against every existing question's composite text
-4. Questions scoring ≥ `supabase_similarity_threshold` (default 80%) are dropped as duplicates
-5. Also run intra-batch check: new questions are compared against each other to avoid uploading duplicates from the same run
-6. Survivors are renumbered starting from `max(existing) + 1` for gapless numbering
-7. Filtered run is inserted into Supabase (idempotent: if `run_id` already exists, the call is skipped)
-
-**Why `token_set_ratio`:** It tokenises both strings, sorts the tokens, and computes ratios on the sorted + unsorted combinations. This is order-insensitive — it catches paraphrasing like "Which tool builds X?" vs "What tool is used to build X?" better than a plain string ratio.
-
-**Manual deduplication tools:**
+| `runs` | `run_id` (UUID) · `timestamp` · `input_file` · `config_json` · `passed_count` · `cost_usd` · `generation_number` |
+| `mcqs` | `id` · `run_id` · `mcq_json` · `passed` (1/0) · `critique_json` · `question_number` |
+| `concept_maps` | `file_hash` (MD5) · `source_file` · `concept_map_json` |
 
 ```powershell
-# Check a generated file for duplicates against local SQLite DB
-python check_similarity.py output/my_lesson_accepted.json
-
-# Stricter threshold (drops more)
-python check_similarity.py output/my_lesson_accepted.json --threshold 70
-
-# Report only — don't write a cleaned output file
-python check_similarity.py output/my_lesson_accepted.json --report-only
-
-# Manual Supabase migration
-python migrate_to_supabase.py --latest         # push most recent run
-python migrate_to_supabase.py --run-id <uuid>  # push specific run
-python migrate_to_supabase.py                  # push all runs (idempotent)
-python migrate_to_supabase.py --latest --dry-run  # preview without writing
+# Useful raw queries
+sqlite3 logs/runs.db "SELECT run_id, timestamp, passed_count, cost_usd FROM runs;"
+sqlite3 logs/runs.db "SELECT COUNT(*) FROM mcqs WHERE passed=1;"
+sqlite3 logs/runs.db "DELETE FROM concept_maps;"   # clear analyzer cache
 ```
+
+### Concept Map Cache
+
+1. MD5(source file content) → query `concept_maps`
+2. **Hit** → return cached ConceptMap instantly. Zero tokens.
+3. **Miss** → call LLM, save with `INSERT OR REPLACE`
+
+Same content always hits the cache regardless of file rename or move.
+
+### Supabase (cloud — optional)
+
+Purpose: a clean, deduplicated cloud question bank. Unlike SQLite (everything including rejects), Supabase stores only accepted, deduplicated questions with gapless sequential numbering.
+
+**Setup:**
+1. Create project at https://supabase.com
+2. SQL Editor → run `supabase_schema.sql`
+3. Copy **Project URL** → `SUPABASE_URL` in `.env`
+4. Copy **Secret (service_role)** key → `SUPABASE_KEY` in `.env` (NOT the anon key)
+5. `config.yaml`: `enable_supabase: true`
+
+**Verify:** `python migrate_to_supabase.py --latest --dry-run`
+
+### Deduplication Algorithm
+
+1. Fetch all existing questions from Supabase (paginated, batches of 1000)
+2. Composite text per question = stem + all option texts
+3. `rapidfuzz.fuzz.token_set_ratio` against every existing composite text
+4. Score ≥ `supabase_similarity_threshold` (default 80%) → dropped
+5. Intra-batch dedup: new questions also checked against each other
+6. Survivors renumbered from `max(existing) + 1`
+7. Push is idempotent — `run_id` already present → skip
+
+**Why `token_set_ratio`:** order-insensitive, catches paraphrasing ("Which tool builds X?" vs "What tool is used to build X?").
 
 ---
 
-## 8. Module Reference
+## 9. GUI Tab Reference
+
+| Tab | Icon | What it does |
+|---|---|---|
+| **Model** | Sliders | Graphical editor for `config.yaml` — 6 sections (provider, generation, quality, tokens, temperatures, linter). Profile save/load. Non-destructive YAML writes that preserve user comments. |
+| **Dashboard** | BarChart | 4 sub-tabs: **Overview** (KPI strip + 4 charts: questions/gen, type donut, cost/run, difficulty), **Quality** (validator failure bar, reframer-class pie, Critic criteria heatmap, source-linter stats), **Cost & Tokens** (cumulative cost + forecast, cache-hit rate, token-usage stacked bar, cost/question scatter), **Run History** (sortable table + per-run Inspect drawer + JSON export). |
+| **Files** | Database | Graphical SQL query builder (difficulty · bloom · question type · source file · heading · date range · pass-only toggle). Card and table result views. Export to **JSON / DOCX / PDF**. DB management panel (SQLite health, concept-cache clear, Supabase push). |
+| **Run** | Play | Upload `.md` file → Layer-1 source quality card → run config panel (count, difficulty, type) → live execution timeline (stage cards with token counts + cost) → accepted question feed → run completion card. Cancel mid-run. |
+| **Eval Set** | CheckCircle | Create named question sets from the DB (difficulty/bloom/source-file filters, random or sequential fetch). Browse & Annotate view: 5-star quality rating, Correct/Wrong verdict toggle, notes textarea, collapsible source excerpt. Table view with sortable columns. Quality Summary panel (Critic false-positive rate, avg rating, breakdowns by difficulty and bloom level). Import/export as JSON. |
+
+---
+
+## 10. Module Reference
 
 ### Pipeline package (`mcq_agent/`)
 
 | Module | Role |
-|--------|------|
-| `cli.py` | Typer CLI — 3 commands: `generate`, `list-runs`, `show-run` |
-| `pipeline.py` | Orchestrator — runs all stages in order, manages guarantee-n retry loop, writes output files |
-| `parser.py` | Markdown → `ParsedDocument` (T1/T2/T3 tiers) using `markdown-it` |
-| `analyzer.py` | Stage 1 — `ConceptMap` extraction with SQLite cache; uses `resolved_analyzer_model()` |
-| `generator.py` | Stage 2 — MCQ candidate generation (batched, mixed types, concept-sorted) |
-| `critic.py` | Stage 3 — per-MCQ LLM quality evaluation with T3 source slicing |
+|---|---|
+| `cli.py` | Typer CLI — `generate`, `list-runs`, `show-run`, `push-supabase`, `lint`, `config-dump` |
+| `pipeline.py` | Orchestrator — all stages in order, guarantee-n retry, output files |
+| `parser.py` | Markdown → `ParsedDocument` (T1/T2/T3 tiers) using `markdown-it-py` |
+| `analyzer.py` | Stage 1 — `ConceptMap` extraction with MD5 SQLite cache |
+| `generator.py` | Stage 2 — per-Bloom fan-out MCQ generation (batched, mixed types) |
+| `critic.py` | Stage 3 — per-MCQ evaluation with T3 source slicing |
 | `reframer.py` | Stage 4 — 5-class targeted salvage; re-validates after each fix |
-| `validators.py` | 7 deterministic pre-critic checks; `shuffle_correct_answer_positions()` utility |
-| `source_linter.py` | 2-layer source quality gate (Layer 1: static; Layer 2: post-Analyzer) |
+| `validators.py` | 7 deterministic checks; `shuffle_correct_answer_positions()` |
+| `source_linter.py` | Layer 1+2 source quality gates |
 | `schemas.py` | 40+ Pydantic v2 models for all data structures |
-| `config.py` | Loads `config.yaml` + `.env`; 6 `resolved_*()` methods for per-stage model resolution |
-| `llm_client.py` | Provider-agnostic LLM wrapper (`AnthropicClient`, `GroqClient`, `OpenRouterClient`); all expose `.call(prompt, response_model)` |
+| `config.py` | Loads `config.yaml` + `.env`; `resolved_*()` per-stage model methods |
+| `llm_client.py` | Provider-agnostic wrapper — `AnthropicClient`, `GroqClient`, `OpenRouterClient` |
 | `storage.py` | SQLite persistence — runs, mcqs, concept_maps tables |
-| `similarity.py` | Shared dedup logic: `composite_text()`, `best_match()`, `filter_questions()` |
+| `similarity.py` | Dedup core: `composite_text()`, `best_match()`, `filter_questions()` |
 | `supabase_gate.py` | Cloud sync: fetch → similarity filter → renumber → push |
-| `supabase_storage.py` | Supabase CRUD operations |
 
-### Standalone scripts (project root)
+### GUI electron modules (`gui/electron/`)
+
+| Module | Role |
+|---|---|
+| `main.ts` | Electron entry — creates `BrowserWindow`, calls `registerIpc()` |
+| `ipc.ts` | 30+ `ipcMain.handle` handlers; single source of truth for all IPC |
+| `preload.ts` | `contextBridge.exposeInMainWorld('api', ...)` — frozen renderer contract |
+| `db.ts` | sql.js WASM read-only snapshot; `reload()` after pipeline runs |
+| `sidecar.ts` | Spawn Python subprocess; readline NDJSON stream → renderer events |
+| `paths.ts` | `resolvePython()`, `REPO_ROOT`, `DB_PATH`, `CONFIG_PATH` |
+| `modelConfig.ts` | YAML `Document` (comment-preserving) config read/write |
+| `export.ts` | JSON / DOCX (`docx` npm) / PDF (hidden `BrowserWindow.printToPDF`) |
+| `evalset.ts` | `eval-sets/` JSON CRUD — `list`, `load`, `save`, `delete` |
+| `outputs.ts` | Reads `output/*_run_config.json` + `*_source_quality.json` for token data |
+| `lint.ts` | Layer-1 linter via Python sidecar `lint --json` |
+| `config.ts` | Raw `config.yaml` read (for Model tab display) |
+
+### Standalone scripts
 
 | Script | Role |
-|--------|------|
-| `check_similarity.py` | CLI — check a JSON file for near-duplicates against local SQLite DB |
-| `migrate_to_supabase.py` | CLI — push local SQLite runs to Supabase; supports `--latest`, `--run-id`, `--dry-run`, `--threshold` |
-| `setup_venv.ps1` | PowerShell — create `.venv`, install deps, run smoke tests |
-| `setup_venv.bat` | Batch — same as above for Command Prompt users |
-
-### Prompts (editable)
-
-| File | What it controls |
-|------|----------------|
-| `prompts/analyzer.txt` | How the Analyzer extracts concepts, procedures, facts, etc. from source |
-| `prompts/generator.txt` | Quality criteria, stem patterns, distractor strategy, anti-patterns |
-| `prompts/critic.txt` | Evaluation rubric (13 criteria), scoring logic, pass/fail gating |
-| `prompts/few_shot_examples.json` | Gold-standard example MCQs injected into the Generator prompt |
+|---|---|
+| `check_similarity.py` | CLI — check a JSON file for near-duplicates vs local SQLite DB |
+| `migrate_to_supabase.py` | CLI — push runs to Supabase; `--latest`, `--run-id`, `--dry-run` |
+| `setup_venv.ps1` / `setup_venv.bat` | Create `.venv`, install deps, run smoke tests |
 
 ---
 
-## 9. Data Models
+## 11. Data Models
 
-All models are in `mcq_agent/schemas.py` (Pydantic v2).
+All models in `mcq_agent/schemas.py` (Pydantic v2).
 
-### MCQ — the core output unit
+### MCQ
 
 ```
 MCQ
-├── question_stem          str        — the question text
+├── question_stem          str
 ├── options                List[Option]
-│   ├── label              str        — "A" | "B" | "C" | "D"
-│   ├── text               str        — option text
+│   ├── label              str              "A" | "B" | "C" | "D"
+│   ├── text               str
 │   ├── is_correct         bool
-│   └── distractor_rationale  str | None  — why this wrong answer is plausible
-├── explanation            str        — correct reasoning; must explain why distractors fail
-├── source_excerpt         str        — verbatim quote from the document
-├── source_heading         str        — section heading where the answer is found
-├── bloom_level            BloomLevel — remember | understand | apply | analyze | evaluate | create
-├── difficulty             Difficulty — easy | medium | hard | expert
-├── question_type          QuestionType — single_correct | ordering | code_snippet
-├── stem_pattern           StemPattern — definition | scenario | debugging | comparison | procedure
+│   └── distractor_rationale  str | None
+├── explanation            str              correct reasoning + why distractors fail
+├── source_excerpt         str              verbatim quote from document
+├── source_heading         str              section heading
+├── bloom_level            BloomLevel       remember|understand|apply|analyze|evaluate|create
+├── difficulty             Difficulty       easy | medium | hard | expert
+├── question_type          QuestionType     single_correct | ordering | code_snippet
+├── stem_pattern           StemPattern      definition|scenario|debugging|comparison|procedure
 ├── topic_tags             List[str]
-├── question_number        int | None  — global sequential number (assigned end-of-pipeline)
-└── generation_number      int | None  — which run produced this question
+├── question_number        int | None       global sequential (assigned end-of-pipeline)
+└── generation_number      int | None       which run produced this
 ```
 
-### ConceptMap — knowledge graph extracted by the Analyzer
+### ConceptMap
 
 ```
 ConceptMap
 ├── concepts               List[Concept]
-│   ├── name               str
-│   ├── definition         str
-│   ├── testability_score  int (1–5)    — higher = more likely to produce good MCQs
-│   ├── difficulty_range   DifficultyRange
-│   ├── question_templates List[QuestionTemplate]
-│   ├── prerequisite_concepts  List[str]
-│   └── confusion_pairs    List[ConfusionPair]   — used by Reframer for distractor fix
-├── procedures             List[Procedure]
-│   ├── name, steps, decision_points, failure_modes
+│   ├── name, definition
+│   ├── testability_score  int (1–5)
+│   ├── difficulty_range, question_templates
+│   ├── prerequisite_concepts
+│   └── confusion_pairs    ← Reframer uses for distractor replacement
+├── procedures             List[Procedure]  (steps, decision_points, failure_modes)
 ├── technical_facts        List[str]
 ├── code_examples          List[CodeExample]
 ├── thematic_clusters      List[ThematicCluster]
 └── prerequisite_chains    List[PrerequisiteChain]
 ```
 
-### CritiqueResult — Critic's verdict per MCQ
+### CritiqueResult
 
 ```
 CritiqueResult
 ├── passed                 bool
-├── issues                 List[str]    — human-readable failure reasons
+├── issues                 List[str]
 ├── suggested_fix          str | None
-├── criteria               dict[str, bool]   — 13 binary criteria (a–m)
-└── failure_class          str | None   — A | B | C | D | E | SKIP (for Reframer)
+├── criteria               dict[str, bool]  13 binary criteria a–m
+└── failure_class          str | None       A|B|C|D|E|SKIP (for Reframer)
 ```
 
-### PipelineRun — complete run record
+### PipelineRun
 
 ```
 PipelineRun
-├── run_id                 str          — UUID
-├── timestamp              datetime
-├── input_file             str
-├── config                 MCQConfig    — settings snapshot
+├── run_id, timestamp, input_file
+├── config                 MCQConfig
 ├── concept_map            ConceptMap
-├── generated_count        int          — total candidates generated
-├── passed_count           int          — candidates that passed all gates
-├── final_mcqs             List[MCQ]    — accepted questions
+├── generated_count, passed_count, salvaged_count
+├── final_mcqs             List[MCQ]
 ├── rejected_mcqs          List[tuple[MCQ, CritiqueResult]]
-├── analyzer_cost_usd      float
-├── generator_cost_usd     float
-├── critic_cost_usd        float
-├── reframe_cost_usd       float
-├── total_cost_usd         float
-├── salvaged_count         int          — questions rescued by the Reframer
-├── generation_number      int          — sequential run counter (1, 2, 3 …)
-└── topic                  str | None   — lesson topic label (set via --topic CLI flag)
+├── analyzer/generator/critic/reframe_cost_usd
+├── total_cost_usd
+├── generation_number      sequential run counter (1, 2, 3 …)
+└── topic                  str | None
+```
+
+### Eval Set types (GUI-only, in `gui/src/types.ts`)
+
+```
+EvalAnnotation  { rating: 0–5, confirmed: bool|null, notes: string }
+EvalQuestion    McqRow & { annotation: EvalAnnotation }
+EvalSet         { name, created_at, questions: EvalQuestion[] }
+EvalSetMeta     { name, created_at, count, annotated }
 ```
 
 ---
 
-## 10. CLI Reference
+## 12. CLI Reference
 
-### `mcq-agent generate` — run the full pipeline
+### `mcq-agent generate`
 
 ```powershell
 mcq-agent generate <input_file.md> [OPTIONS]
 
-Options:
   --output, -o        Output directory (default: output/)
   --count, -n         Target question count; overrides config.yaml
   --difficulty, -d    easy | medium | hard | expert
   --type, -t          single_correct | ordering | code_snippet
-  --topic, -T         Lesson topic label stored in Supabase for filtering
-                      (e.g. 'MQTT Protocol'). Defaults to filename stem in title case.
-  --config            Path to an alternate config.yaml
-  --verbose, -v       Enable DEBUG-level structured logging
+  --topic, -T         Lesson topic label (stored in Supabase; defaults to filename)
+  --config            Path to alternate config.yaml
+  --verbose, -v       DEBUG-level structured logging
+  --json-events       NDJSON event stream (used by GUI sidecar)
 
 Examples:
   mcq-agent generate examples/sample_lesson.md
@@ -980,283 +962,317 @@ Examples:
   mcq-agent generate lesson.md --config configs/groq_config.yaml
 ```
 
-### `mcq-agent list-runs` — view run history
+### `mcq-agent list-runs`
 
 ```powershell
 mcq-agent list-runs [--limit N]
-
-# Shows: run_id, timestamp, input file, generated/accepted counts, cost per run
+# Shows: run_id, timestamp, input file, counts, cost
 ```
 
-### `mcq-agent show-run` — inspect a specific run
+### `mcq-agent show-run`
 
 ```powershell
 mcq-agent show-run <run-uuid>
-# or (short ID works too):
 mcq-agent show-run <first-8-chars>
+# Shows: full config, model routing, all accepted MCQs, per-stage cost
+```
 
-# Shows: full config, model routing, all accepted questions, per-stage cost breakdown
+### `mcq-agent push-supabase`
+
+```powershell
+mcq-agent push-supabase --latest               # push most recent run
+mcq-agent push-supabase --run-id <uuid>        # push specific run
+mcq-agent push-supabase --latest --dry-run     # preview without writing
+```
+
+### `mcq-agent lint`
+
+```powershell
+mcq-agent lint <input_file.md>            # Layer-1 linter only (free, no API)
+mcq-agent lint <input_file.md> --json     # machine-readable output (used by GUI)
+```
+
+### `mcq-agent config-dump`
+
+```powershell
+mcq-agent config-dump                     # current resolved config as JSON
+mcq-agent config-dump --defaults          # factory defaults (for GUI Reset button)
 ```
 
 ---
 
-## 11. Output Files
+## 13. Output Files
 
 Each generation run produces four files in `output/` named with the source file's stem and difficulty:
 
 | File | Contents |
-|------|----------|
+|---|---|
 | `<label>_accepted.json` | Array of MCQ objects that passed all quality gates. Includes `question_number` and `generation_number`. |
-| `<label>_rejected.json` | Array of `{mcq, critique}` pairs — questions that failed. Useful for diagnosing prompt issues or thin source material. |
-| `<label>_source_quality.json` | `SourceQualityReport` — Layer 1 and Layer 2 linter results. Shows which checks passed, warned, or failed and by how much. |
-| `<label>_run_config.json` | Full run metadata — config used, model routing, token usage per stage, cost breakdown per stage, number of questions salvaged by Reframer. |
-
-**Example `_accepted.json` entry:**
-
-```json
-{
-  "question_stem": "Which protocol does MQTT use at the transport layer?",
-  "options": [
-    {"label": "A", "text": "UDP",  "is_correct": false, "distractor_rationale": "UDP is connectionless; MQTT requires reliable delivery."},
-    {"label": "B", "text": "TCP",  "is_correct": true,  "distractor_rationale": null},
-    {"label": "C", "text": "HTTP", "is_correct": false, "distractor_rationale": "HTTP is the application layer; MQTT is a separate protocol."},
-    {"label": "D", "text": "TLS",  "is_correct": false, "distractor_rationale": "TLS is the security layer, not the transport protocol."}
-  ],
-  "explanation": "MQTT runs over TCP because it requires an ordered, reliable, connection-oriented channel. TLS can wrap the TCP connection for encryption but is not itself the transport layer.",
-  "source_excerpt": "MQTT relies on TCP/IP as its transport protocol, which guarantees ordered and reliable message delivery.",
-  "bloom_level": "remember",
-  "difficulty": "easy",
-  "question_type": "single_correct",
-  "question_number": 42,
-  "generation_number": 5
-}
-```
+| `<label>_rejected.json` | Array of `{mcq, critique}` pairs — questions that failed. Useful for diagnosing prompt issues. |
+| `<label>_source_quality.json` | `SourceQualityReport` — Layer 1 + Layer 2 linter results with per-check pass/warn/fail status. |
+| `<label>_run_config.json` | Full run metadata — config snapshot, model routing, token counts + cost per stage, salvage count. |
 
 ---
 
-## 12. Quality Rules — Design Rationale
+## 14. Production-Grade Engineering
+
+This section documents the engineering decisions that make the pipeline reliable and cost-efficient at scale.
+
+### Structured Output Throughout — instructor + Pydantic v2
+
+Every LLM call returns a fully typed Pydantic v2 model, never raw text. The `instructor` library wraps each provider's SDK and automatically retries on JSON parse failure or schema mismatch. There is no string parsing or regex anywhere in the pipeline — all data flows through validated data classes.
+
+```python
+# Example: every stage call looks like this
+concept_map: ConceptMap = client.call(prompt, response_model=ConceptMap)
+mcqs: MCQList = client.call(prompt, response_model=MCQList)
+```
+
+This means schema drift is caught at parse time, not silently propagated. If the LLM returns extra fields or wrong types, `instructor` retries before the calling code ever sees a result.
+
+---
+
+### Multi-Tier Document Compression — T1 / T2 / T3
+
+The source document is read once and compressed into three tiers in `parser.py`:
+
+| Tier | Content | Size vs T1 | Used by |
+|---|---|---|---|
+| T1 | Full Markdown | 100% | Analyzer (once, then cached) |
+| T2 | First 3 sentences + code blocks per section | ~30–60% | Generator, Reframer |
+| T3 | Heading + top-20 key terms per section | ~5–10% | Critic source-slicing |
+
+The Critic never reads the full document. It uses T3 fingerprints to locate the single relevant section, then reads only that section. This reduces Critic input tokens by ~88% compared to sending the full document for each MCQ evaluation.
+
+---
+
+### Fail-Fast Quality Gates — Free Checks Before Paid Calls
+
+Two layers of source quality checks run before any API call is made:
+
+- **Layer 1** (static, ~0ms): word count, section count, code density — checked in `parser.py`
+- **Layer 2** (post-Analyzer, no extra API cost): concept density, procedural richness, technical fact count — checked after the cached ConceptMap is retrieved
+
+A `FAIL` at either layer aborts the entire run immediately. This prevents wasting credits on a source document that cannot produce good MCQs. The linter results are saved to `output/<label>_source_quality.json` and shown in the GUI's Run tab Source Quality card.
+
+---
+
+### MD5-Keyed Analysis Cache — Zero Redundant LLM Calls
+
+The Analyzer is the most expensive stage (premium model, full document). The pipeline computes `MD5(file content)` and checks `concept_maps` in SQLite before calling the LLM:
+
+- Same file content (regardless of path/name) → instant cache hit, 0 tokens
+- Any content change (even a typo fix) → MD5 changes → fresh analysis
+- The GUI's DB management panel can clear the cache if needed
+
+In practice this means iterating on prompt changes or retrying failed runs costs nothing for the analysis stage.
+
+---
+
+### Guarantee-N Retry Loop with Deficit Tracking
+
+The pipeline doesn't give up after one generator pass. It tracks a precise **deficit** (target − accepted so far) and requests exactly that many questions on each retry:
+
+```
+Iteration 1: ask for 20 (target 10, factor 2.0) → 7 accepted → deficit 3
+Iteration 2: ask for 6 (deficit 3, factor 2.0)  → 3 accepted → deficit 0 → exit
+```
+
+This means a run configured for 10 questions always tries to deliver exactly 10, regardless of how many candidates are rejected. The loop runs up to `guarantee_n_retries` (default: 20) times before giving up with what it has.
+
+---
+
+### Fuzzy Deduplication Gate — token_set_ratio
+
+Questions are deduplicated using `rapidfuzz.fuzz.token_set_ratio`, which:
+- Tokenises both strings (question stem + all option texts)
+- Sorts tokens, computes ratios on sorted + unsorted combinations
+- Is order-insensitive — catches paraphrasing like "Which tool builds X?" vs "What tool is used to build X?"
+
+The gate runs both inter-batch (new vs existing in Supabase) and intra-batch (new questions vs each other). Questions scoring ≥ `supabase_similarity_threshold` (default 80%) are dropped before the cloud push.
+
+---
+
+### Per-Bloom Temperature Fan-Out
+
+Different cognitive complexity levels require different generation temperatures. `generator.py` fans out into one LLM call per active Bloom level, each at its configured temperature from `bloom_temperatures`:
+
+```yaml
+bloom_temperatures:
+  remember: 0.5    # constrained recall — low temperature, precise
+  understand: 0.6
+  apply: 0.7
+  analyze: 0.7
+  evaluate: 0.8
+  create: 0.9      # creative synthesis — high temperature, novel
+```
+
+This produces more cognitively authentic questions at each level compared to generating all Bloom levels in a single call at a single temperature.
+
+---
+
+### Position Bias Elimination
+
+LLMs systematically place correct answers at position B or C. Across 8 questions in two sample runs, no correct answer was ever at A or D.
+
+`shuffle_correct_answer_positions()` in `validators.py` mechanically reassigns A/B/C/D labels after generation using a random permutation. The Generator prompt also instructs distributing correct answers evenly — the shuffle enforces this regardless of what the LLM actually produced.
+
+---
+
+### Comment-Preserving Config Writes
+
+The Model tab editor writes config changes without destroying user comments in `config.yaml`. `modelConfig.ts` uses the `yaml` npm package's `Document` API (`setIn`) rather than JSON-parse-round-trip or string replacement:
+
+```typescript
+const doc = parseDocument(raw)     // preserves comments as nodes
+for (const [key, val] of changes)  doc.setIn([key], val)
+fs.writeFileSync(CONFIG_PATH, String(doc))
+```
+
+A user who annotates their config with comments about why thresholds were tuned does not lose that context when they use the GUI editor.
+
+---
+
+### WASM SQLite — Cross-Machine Portability
+
+The GUI uses `sql.js` (SQLite compiled to WebAssembly) instead of `better-sqlite3` (native C++ binding). This means:
+
+- Zero native build required — installs identically on any machine with Node.js
+- No `electron-rebuild` step after dependency changes
+- The DB is loaded into memory as a WASM snapshot; `db.ts` exposes a `reload()` method called after each pipeline run to pick up new rows
+
+The tradeoff (whole-DB in memory, no write path) is acceptable because the GUI only reads the DB — all writes go through the Python pipeline.
+
+---
+
+### Frozen IPC Contract
+
+The `preload.ts` / `api.d.ts` surface is treated as a frozen API boundary. The renderer never imports from the main process; it only calls `window.api.*`. This means:
+
+- The renderer can be developed and tested independently of the main process
+- New IPC handlers can be added; existing handlers must stay stable
+- The Python NDJSON event schema (`stage_start`, `stage_done`, `question_accepted`, etc.) is documented in `mcq_agent/cli.py` and mirrored in `gui/src/types.ts`
+
+---
+
+### Debounced Auto-Save for Annotations
+
+The Eval Set tab saves annotation changes (ratings, verdicts, notes) with a 600 ms debounce:
+
+```typescript
+// 600ms quiet → save + refresh list count
+if (saveTimer.current) clearTimeout(saveTimer.current)
+saveTimer.current = setTimeout(() => save(updated), 600)
+```
+
+Rapid toggles (e.g. clicking through star ratings) do not generate a save-per-click. The timer is stored in a `useRef` so it persists across renders without causing re-render loops.
+
+---
+
+### Reframer Taxonomy — Targeted Fix Over Discard
+
+The Reframer is the difference between a ~65% acceptance rate and a ~85%+ rate. Instead of discarding every Critic failure, it classifies each failure into one of 5 classes and applies the minimum intervention:
+
+- **Class A** (length parity): expand distractors using ConceptMap confusion pairs — don't touch the correct answer
+- **Class B** (grounding): find a new verbatim excerpt from the source section — don't change the question
+- **Class C** (distractors): replace weak distractors using confusion pairs
+- **Class D** (unsourced correct answer): trim to only source-supported claims
+- **Class E** (B + A): sequence B then A
+
+SKIP is reserved for structural failures that cannot be fixed without generating a new question. The class is determined by the Critic's `failure_class` field in `CritiqueResult`.
+
+---
+
+## 15. Quality Rules — Design Rationale
 
 These rules were added based on systematic analysis of output quality across two pipeline builds.
 
-### Stem economy (rule #9)
+### Stem Economy (Rule #9)
 
-**Problem identified:** Stems averaged 60 words vs 37 words in a better build. Brutal Critic feedback caused the Generator to over-specify context defensively. One question listing 5 hardware components and a 15-minute compliance window only asked "which component is an actuator."
+**Problem:** Stems averaged 60 words vs 37 in a better build. Brutal Critic feedback caused the Generator to over-specify context defensively. One question listing 5 hardware components and a 15-minute compliance window only asked "which component is an actuator."
 
 **Rule:** Include only context that bears directly on the question. If removing a sentence doesn't change what's being asked, remove it.
 
-**Enforcement:** Criterion (i) in the Critic prompt; anti-pattern example ("BAD: stem inflation") in the Generator prompt.
+**Enforcement:** Criterion (i) in the Critic prompt; anti-pattern example in the Generator prompt.
 
-### Option length parity (rule #11)
+### Option Length Parity (Rule #11)
 
-**Problem identified:** Across two output sets, the correct answer was consistently 27–30% longer than the median distractor. Experienced test-takers learn to pick the longest option. File 1: correct options averaged 22.0 words, distractors 17.3 (1.27×). File 2: 17.3 vs 13.3 (1.30×).
+**Problem:** The correct answer was consistently 27–30% longer than the median distractor across two output sets. Experienced test-takers learn to pick the longest option. File 1: correct = 22.0 words, distractors = 17.3 (ratio 1.27×). File 2: 17.3 vs 13.3 (1.30×).
 
 **Rule:** Correct answer must stay within ±20% of median distractor word count. When the correct answer is naturally longer, expand the distractors — don't trim the correct answer.
 
-**Enforcement:** `validate_length_parity` validator (deterministic, free); criterion (j) in the Critic prompt.
+**Enforcement:** `validate_length_parity` validator (deterministic, free); criterion (j) in the Critic prompt; Class A Reframer fix.
 
-### Source-phrase independence (rule #10)
+### Source-Phrase Independence (Rule #10)
 
-**Problem identified:** In both output sets, the correct answer frequently reproduced 5+ word verbatim phrases from `source_excerpt`. One example: "fundamental intelligence must be local and robust" — copied word-for-word. This allows phrase-matching instead of understanding.
+**Problem:** Correct answers frequently reproduced 5+ word verbatim phrases from `source_excerpt`. One example: "fundamental intelligence must be local and robust" — copied word-for-word. Allows phrase-matching instead of understanding.
 
 **Rule:** The correct answer must paraphrase the source, not echo it.
 
-**Enforcement:** `validate_source_phrase_overlap` validator (5-gram string matching, free); criterion (k) in the Critic prompt.
+**Enforcement:** `validate_source_phrase_overlap` validator (5-gram matching); criterion (k) in the Critic prompt.
 
-### Correct answer position distribution
+### Correct Answer Position Distribution
 
-**Problem identified:** Across 8 questions in two output sets, the correct answer was never at position A or D — all correct answers were B or C. This is a known LLM position bias.
+**Problem:** Across 8 questions in two runs, every correct answer was at position B or C — a known LLM position bias.
 
-**Fix:** Generator prompt instructs distributing correct answers evenly across A/B/C/D. `shuffle_correct_answer_positions()` in `validators.py` mechanically reassigns labels post-generation.
+**Fix:** Generator prompt instructs even A/B/C/D distribution. `shuffle_correct_answer_positions()` mechanically enforces it post-generation.
 
-### Quick Check section flagging
+### Quick Check Section Flagging
 
-**Problem identified:** Questions drawn from a document's "Quick Check" section are near-paraphrases of the source's own self-assessment prompts — students who read the chapter already saw the question.
+**Problem:** Questions drawn from "Quick Check" sections are near-paraphrases of the source's own self-assessment prompts.
 
-**Fix:** The Analyzer prompt flags Quick Check / self-assessment sections with `is_foundational=true` and a transformation warning. The Generator is instructed to significantly transform scenarios from these sections.
-
----
-
-## 13. GUI Roadmap
-
-### Phase 1 — Streamlit PoC (current target)
-
-**Why Streamlit:** Pure Python, no frontend skills needed, direct pipeline import, free hosting on Streamlit Community Cloud. Right tool for a fast internal demo.
-
-**Install:**
-```powershell
-pip install streamlit plotly
-streamlit run app.py
-```
-
-**Planned screens:**
-
-```
-Sidebar navigation
-├── Generate       ← Upload .md → one-click generate → live progress → results
-├── Dashboard      ← Metrics: total questions, acceptance rate, cost per run, chart
-├── History        ← Table of all runs, download accepted/rejected JSON
-└── Duplicate Check ← Upload a JSON → similarity report vs DB + Supabase
-```
-
-**Security model:**
-- API keys stay in `.env` on the server; Streamlit reads them via `python-dotenv`
-- If deploying to Streamlit Community Cloud: store secrets in `.streamlit/secrets.toml` (not committed) — Streamlit maps these as env vars automatically
-- For internal use: run on localhost only
+**Fix:** Analyzer flags these sections with `is_foundational=true`. Generator is instructed to significantly transform scenarios from foundational sections.
 
 ---
 
-### Phase 2 — Tauri Desktop App (production)
+## 16. Troubleshooting
 
-**Why Tauri:** Native Windows/Linux installer, no hosting, API keys stay in `.env` on the operator's machine, full control over UI design (React + Tailwind CSS).
-
-**Architecture:**
-
-```
-┌─────────────────────────────────┐
-│  Tauri shell (Rust)             │
-│  ┌───────────────────────────┐  │
-│  │  React frontend           │  │
-│  │  (all UI, charts, upload) │  │
-│  └─────────────┬─────────────┘  │
-│                │ Tauri commands  │
-│  ┌─────────────▼─────────────┐  │
-│  │  Python sidecar process   │  │
-│  │  (mcq_agent pipeline)     │  │
-│  └───────────────────────────┘  │
-└─────────────────────────────────┘
-```
-
-The Python pipeline runs as a sidecar. Tauri manages the subprocess, forwards commands, and streams stdout as events to the React UI.
-
-**Tech stack:** Tauri (MIT, free), React + Vite, Tailwind CSS, Recharts or Nivo for charts.
-
----
-
-### UI Design Specifications
-
-**Colour palette (futuristic dark theme):**
-
-```
-Background      #0a0e1a   near-black navy
-Surface         #111827   dark card background
-Border          #1e293b   subtle divider
-Accent primary  #3b82f6   electric blue — actions, highlights
-Accent success  #10b981   emerald green — accepted questions, push success
-Accent warning  #f59e0b   amber — duplicates, warnings
-Accent danger   #ef4444   red — rejections, errors
-Text primary    #f1f5f9   near-white
-Text muted      #64748b   slate grey
-```
-
-**Dashboard layout:**
-
-```
-┌──────────┬──────────┬──────────┬──────────┐
-│ 247      │ 89.3%    │ 14.2%    │ $0.042   │
-│ Questions│ Accept   │ Filtered │ Avg cost │
-│ in bank  │ rate     │ rate     │ per run  │
-└──────────┴──────────┴──────────┴──────────┘
-
-┌──────────────────────────────┬─────────────────────────┐
-│ Questions per generation     │ Type breakdown           │
-│ [bar chart, last 10 runs]    │ [donut: SC/Order/Code]   │
-└──────────────────────────────┴─────────────────────────┘
-
-┌──────────────────────────────────────────────────────┐
-│ Run history table (sortable)                         │
-│ Gen | File | Date | Generated | Accepted | Cost | ↓  │
-└──────────────────────────────────────────────────────┘
-```
-
-**Generate screen UX flow:**
-1. Drag-and-drop `.md` file upload (10 MB limit)
-2. Instant preview: file name, word count, section count (from linter Layer 1 — free)
-3. Config summary panel (read-only): model, difficulty, target count
-4. Large **Generate** button — disabled while running
-5. Live progress: stage name + spinner + elapsed time
-6. Completion card: generated / accepted / rejected / cost / time
-7. Download buttons: accepted JSON, rejected JSON, run config JSON
-
----
-
-### Electron build status (Phase 2, in progress)
-
-The production GUI is being built as an Electron + React + Tailwind app under `gui/`, tracked
-session-by-session in [`docs/BUILD_CHECKLIST.md`](docs/BUILD_CHECKLIST.md) against
-[`docs/GUI_SPEC.md`](docs/GUI_SPEC.md). Run it with `cd gui && npm run dev`.
-
-Functional so far: nav shell + status bar, Python-sidecar IPC, the **Run** tab (upload → linter →
-config → live execution), the **Model** tab (full config.yaml editor), the **Dashboard** KPI
-strip + Overview sub-tab (4 Recharts charts: questions-per-generation, type donut, cost-per-run,
-difficulty distribution), the **Files** tab filter builder + results preview (graphical query
-over the DB: difficulty/bloom/type/source-file/heading/date filters, ratio picker, fetch modes,
-card & table views), plus **export** (JSON/DOCX/PDF — PDF via Electron's bundled Chromium, DOCX via
-the `docx` package) and a **DB-management panel** (SQLite status, health check, concept-cache clear,
-and Supabase push through the Python dedup gate). All reads use `sql.js` read-only. The **Dashboard**
-now has all four sub-tabs: Overview (4 charts), Quality (validator failure bar, reframer-class pie,
-critic-criteria heatmap, source-linter stats table), Cost & Tokens (cumulative cost trend with
-regression forecast, cache-hit-rate stat card, token-usage stacked bar, cost-per-question scatter),
-and Run History (sortable/filterable table with per-run Inspect drawer + JSON export). The **Eval Set**
-tab is fully implemented: create named question sets from the DB (with difficulty/bloom/source-file
-filters + random or sequential fetch), browse and annotate questions (5-star rating, Correct/Wrong
-toggle, notes, collapsible source excerpt), table view (sortable by 7 columns), quality summary
-(Critic false-positive rate, avg rating, breakdown by difficulty and bloom), plus import/export JSON
-and delete. Eval sets are persisted as JSON files in `eval-sets/` (GUI-owned). All 10 build sessions
-are complete.
-
----
-
-## 14. Troubleshooting
-
-### Environment issues
+### Environment
 
 | Symptom | Cause | Fix |
-|---------|-------|-----|
-| `ModuleNotFoundError: No module named 'mcq_agent'` | Package not installed or wrong env active | Activate venv, then `pip install -e .` |
-| `mcq-agent: command not found` | Venv not active or package not installed | Activate venv; run `pip install -e .` |
-| `(.venv)` not showing in prompt | Venv not activated | `.\.venv\Scripts\Activate.ps1` |
-| Venv missing after OS restart | Expected — venv is a local directory | Activate with Activate.ps1; run `setup_venv.ps1` if it's gone |
-| Garbled characters in terminal | Windows CP1252 encoding | Use Windows Terminal or VS Code terminal; or `chcp 65001` |
+|---|---|---|
+| `ModuleNotFoundError: No module named 'mcq_agent'` | Wrong env or package not installed | Activate venv; `pip install -e .` |
+| `mcq-agent: command not found` | Venv not active | `.\.venv\Scripts\Activate.ps1` |
+| GUI shows blank window | Electron extract failed | See [§3.4 GUI Setup](#34-gui-setup-nodejs) for the Expand-Archive fix |
+| GUI "Python not found" error | `.venv/` missing or wrong path | Run `setup_venv.ps1` or set `MCQ_PYTHON` env var to the Python path |
+| `node -e "require('electron')"` prints error | Electron not installed | `cd gui && npm install` |
 
-### API and authentication
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `AuthenticationError` / HTTP 401 | Wrong or missing API key | Check `.env` has the key for the `provider` in `config.yaml` |
-| HTTP 404 from OpenRouter | Model ID incorrect | Use `provider/model-name` format; check https://openrouter.ai/models |
-| HTTP 404 from Groq | Model retired or renamed | Check https://console.groq.com/docs/models |
-| `supabase` module not found | Cloud dependency missing | `pip install supabase>=2.3.0` |
-| RLS violation from Supabase (403) | Using anon key instead of service_role | Replace `SUPABASE_KEY` with the **Secret** (service_role) key |
-
-### Generation quality
+### API and Authentication
 
 | Symptom | Cause | Fix |
-|---------|-------|-----|
-| All questions fail source grounding on first pass | `source_grounding_threshold` too high for document size | Lower to `0.55–0.60` in `config.yaml` |
-| Run produces 0 accepted questions | Source document too thin or structurally poor | Check `<label>_source_quality.json`; ensure 300+ words and 2+ sections |
-| `guarantee_n_retries` exhausted before hitting target | Thresholds too strict or document too narrow | Raise `guarantee_n_retries`; lower `source_grounding_threshold` |
-| Bloom/difficulty mismatch errors (Class SKIP, not reframeable) | Generator produces wrong Bloom level for difficulty | Use `difficulty: easy` for first runs; increase `over_generation_factor` |
-| Questions are near-duplicates of prior runs | Supabase gate disabled | Set `enable_supabase: true`; or run `check_similarity.py` manually |
-| Questions are similar within one run | Narrow concept map | Check concept density score in `_source_quality.json`; enrich source document |
-| Analyzer runs every time (no cache hit) | Source file content changed (even whitespace) | Expected — MD5 cache is content-based. Unchanged file = cache hit. |
+|---|---|---|
+| `AuthenticationError` / HTTP 401 | Wrong or missing API key | Check `.env` matches `provider` in `config.yaml` |
+| HTTP 404 from OpenRouter | Wrong model ID format | Use `provider/model-name` format |
+| Supabase 403 | Using anon key | Replace with **Secret (service_role)** key |
+| GUI "push failed" | Python `.env` not found by sidecar | Ensure `.env` is at repo root; set `SUPABASE_URL` and `SUPABASE_KEY` |
 
-### Cost and performance
+### Generation Quality
 
 | Symptom | Cause | Fix |
-|---------|-------|-----|
-| Unexpectedly high Analyzer cost | Cache not being populated | Run: `sqlite3 logs/runs.db "SELECT COUNT(*) FROM concept_maps;"` — if 0, check `logs/` is writable |
-| Slow generation overall | Large document + many questions | Use a fast model for Generator/Critic; premium model only for Analyzer (cached) |
-| `instructor` JSON parse failures | Complex schema + low-quality model | Lower `temperature`; switch to a more capable model for that stage |
+|---|---|---|
+| All questions fail source grounding | `source_grounding_threshold` too high | Lower to `0.55–0.60` |
+| Run produces 0 accepted questions | Source too thin or structurally poor | Check `<label>_source_quality.json`; ensure 300+ words, 2+ sections |
+| `guarantee_n_retries` exhausted | Thresholds too strict or source too narrow | Raise `guarantee_n_retries`; lower `source_grounding_threshold` |
+| Questions near-duplicate prior runs | Supabase gate disabled | `enable_supabase: true`; or run `check_similarity.py` |
+| Analyzer runs every time | Source file content changed | Expected — MD5-based. Even a space change invalidates the cache. |
 
-### Source quality
+### Cost and Performance
 
-| Linter failure | Meaning | Fix |
-|---------------|---------|-----|
-| `word_count FAIL` | Document too short | Add more content to the lesson |
-| `concept_density FAIL` | Analyzer found too few concepts per section | Add explicit definitions, procedures, or split a monolithic section |
-| `technical_facts FAIL` | No unambiguous facts found | Add explicit numbered facts, specifications, or benchmarks |
-| `code_blocks WARN` | No code blocks in a technical document | Add at least one code example or terminal command |
+| Symptom | Cause | Fix |
+|---|---|---|
+| High Analyzer cost | Cache not populating | `sqlite3 logs/runs.db "SELECT COUNT(*) FROM concept_maps;"` — if 0, check `logs/` is writable |
+| Dashboard charts empty | DB has no runs yet | Run at least one `mcq-agent generate` first |
+| Dashboard Cost & Tokens chart missing | No `output/*.json` files | Ensure `output/` dir is accessible from the GUI (check `paths.ts REPO_ROOT`) |
+
+### Source Quality Linter
+
+| Failure | Meaning | Fix |
+|---|---|---|
+| `word_count FAIL` | Document too short | Add more content |
+| `concept_density FAIL` | Too few concepts per section | Add explicit definitions and procedures |
+| `technical_facts FAIL` | No unambiguous facts | Add numbered specs, benchmarks, or commands |
+| `code_blocks WARN` | No code in a technical doc | Add at least one code example |
 
 ---
 
-*MCQ Agent v0.3.0 — Internal, NxtWave — Last updated: 2026-06-04*
+*MCQ Agent v0.3.0 — Internal, NxtWave Robotics Engineering — Last updated: 2026-06-10*
