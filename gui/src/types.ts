@@ -63,6 +63,11 @@ export interface QuestionAcceptedEvent {
   bloom_level: BloomLevel
   salvaged: boolean
 }
+export interface QuestionRejectedEvent {
+  event: 'question_rejected'
+  failure_class: string
+  issues: string[]
+}
 export interface RunCompleteEvent {
   event: 'run_complete'
   run_id: string
@@ -98,6 +103,7 @@ export type PipelineEvent =
   | StageDoneEvent
   | StageProgressEvent
   | QuestionAcceptedEvent
+  | QuestionRejectedEvent
   | RunCompleteEvent
   | ErrorEvent
 
@@ -154,6 +160,84 @@ export interface CostPoint {
   generation_number: number
   run_id: string
   timestamp: string
+  cost_usd: number
+}
+
+// --- Dashboard sub-tab 2: Quality (§4.2) ---
+export interface CriticHeatmap {
+  criteria: string[]
+  runs: { run_id: string; generation_number: number }[]
+  cells: { criterion: string; run_id: string; passRate: number; n: number }[]
+}
+export interface ValidatorFailure {
+  validator: string
+  count: number
+}
+export interface ReframerClassSlice {
+  class: string
+  count: number
+}
+export interface LinterCheckStat {
+  name: string
+  PASS: number
+  WARN: number
+  FAIL: number
+}
+export interface SourceLinterStats {
+  perCheck: LinterCheckStat[]
+  reports: number
+}
+
+// --- Dashboard sub-tab 3: Cost & Tokens (§4.2) ---
+export interface CumulativeCost {
+  points: {
+    generation_number: number
+    run_id: string
+    timestamp: string
+    cumulative: number
+  }[]
+  slope: number
+  intercept: number
+}
+export interface StageTokenRow {
+  run_label: string
+  generation_number: number | null
+  analyzer_in: number
+  analyzer_out: number
+  generator_in: number
+  generator_out: number
+  critic_in: number
+  critic_out: number
+  reframer_in: number
+  reframer_out: number
+}
+export interface TokenUsageByStage {
+  rows: StageTokenRow[]
+  coverage: { withFiles: number }
+}
+export interface CostPerQuestionPoint {
+  run_id: string
+  generation_number: number
+  requested: number
+  accepted: number
+  costPerQuestion: number
+}
+export interface CacheHitRate {
+  hits: number
+  total: number
+  rate: number | null
+}
+
+// --- Dashboard sub-tab 4: Run History (§4.2) ---
+export interface RunHistoryRow {
+  run_id: string
+  generation_number: number
+  timestamp: string
+  input_file: string
+  source_file: string
+  generated_count: number
+  passed_count: number
+  rejected_count: number
   cost_usd: number
 }
 
@@ -372,4 +456,25 @@ export interface StatusInfo {
   dbRows: number | null
   supabaseEnabled: boolean
   sessionCost: number
+}
+
+// --- Eval Set tab (§7) ---
+export interface EvalAnnotation {
+  rating: number // 1–5; 0 = unrated
+  confirmed: boolean | null // true = confirmed correct, false = flagged wrong
+  notes: string
+}
+export interface EvalQuestion extends McqRow {
+  annotation: EvalAnnotation
+}
+export interface EvalSet {
+  name: string
+  created_at: string
+  questions: EvalQuestion[]
+}
+export interface EvalSetMeta {
+  name: string
+  created_at: string
+  count: number
+  annotated: number
 }

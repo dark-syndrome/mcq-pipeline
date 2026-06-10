@@ -2,6 +2,8 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import * as db from './db'
+import * as evalset from './evalset'
+import * as outputs from './outputs'
 import { readConfig } from './config'
 import { dumpConfig, writeConfig } from './modelConfig'
 import { lintFile } from './lint'
@@ -35,6 +37,20 @@ export function registerIpc(): void {
   ipcMain.handle('db:typeDistribution', () => db.typeDistribution())
   ipcMain.handle('db:difficultyDistribution', () => db.difficultyDistribution())
   ipcMain.handle('db:costPerRun', (_e, limit?: number) => db.costPerRun(limit))
+  // Dashboard sub-tabs 2–4 (§4.2)
+  ipcMain.handle('db:criticCriteriaHeatmap', (_e, limit?: number) =>
+    db.criticCriteriaHeatmap(limit),
+  )
+  ipcMain.handle('db:validatorFailureBreakdown', () => db.validatorFailureBreakdown())
+  ipcMain.handle('db:reframerClassBreakdown', () => db.reframerClassBreakdown())
+  ipcMain.handle('db:cumulativeCost', () => db.cumulativeCost())
+  ipcMain.handle('db:costPerAcceptedQuestion', () => db.costPerAcceptedQuestion())
+  ipcMain.handle('db:runHistory', () => db.runHistory())
+  ipcMain.handle('outputs:tokenUsageByStage', (_e, limit?: number) =>
+    outputs.tokenUsageByStage(limit),
+  )
+  ipcMain.handle('outputs:analyzerCacheHitRate', () => outputs.analyzerCacheHitRate())
+  ipcMain.handle('outputs:sourceLinterStats', () => outputs.sourceLinterStats())
   ipcMain.handle('db:filterOptions', () => db.filterOptions())
   ipcMain.handle('db:queryMcqs', (_e, filter?: db.McqFilter) =>
     db.queryMcqs(filter ?? {}),
@@ -115,6 +131,40 @@ export function registerIpc(): void {
   ipcMain.handle('db:status', () => db.dbStatus())
   ipcMain.handle('db:health', () => db.dbHealth())
   ipcMain.handle('db:clearConceptCache', () => db.clearConceptCache())
+
+  // --- Eval Set tab (§7) --- JSON files in <repo>/eval-sets/ ---
+  ipcMain.handle('evalset:list', () => evalset.listEvalSets())
+  ipcMain.handle('evalset:load', (_e, name: string) => evalset.loadEvalSet(name))
+  ipcMain.handle('evalset:save', (_e, set: evalset.EvalSet) => evalset.saveEvalSet(set))
+  ipcMain.handle('evalset:delete', (_e, name: string) => evalset.deleteEvalSet(name))
+
+  ipcMain.handle(
+    'evalset:export',
+    async (e, set: evalset.EvalSet, defaultName: string) => {
+      const win = BrowserWindow.fromWebContents(e.sender)
+      const result = await dialog.showSaveDialog(win ?? undefined!, {
+        defaultPath: `${defaultName}.json`,
+        filters: [{ name: 'JSON Eval Set', extensions: ['json'] }],
+      })
+      if (result.canceled || !result.filePath) return null
+      fs.writeFileSync(result.filePath, JSON.stringify(set, null, 2), 'utf-8')
+      return result.filePath
+    },
+  )
+
+  ipcMain.handle('evalset:import', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const result = await dialog.showOpenDialog(win ?? undefined!, {
+      properties: ['openFile'],
+      filters: [{ name: 'JSON Eval Set', extensions: ['json'] }],
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    try {
+      return JSON.parse(fs.readFileSync(result.filePaths[0], 'utf-8'))
+    } catch {
+      return null
+    }
+  })
 
   // --- Supabase push (§5.7) via the Python dedup gate ---
   ipcMain.handle(

@@ -1,10 +1,16 @@
 import type {
   AppConfig,
+  CacheHitRate,
+  CostPerQuestionPoint,
   CostPoint,
+  CriticHeatmap,
+  CumulativeCost,
   DashboardKpis,
   DbHealth,
   DbStatus,
   DifficultySlice,
+  EvalSet,
+  EvalSetMeta,
   ExportOptions,
   FilterOptions,
   FullConfig,
@@ -15,10 +21,15 @@ import type {
   PipelineEvent,
   ProcessExitEvent,
   QueryResult,
+  ReframerClassSlice,
   RowCounts,
+  RunHistoryRow,
   RunRow,
+  SourceLinterStats,
   SupabasePushEvent,
+  TokenUsageByStage,
   TypeSlice,
+  ValidatorFailure,
 } from './types'
 
 export interface RunStartParams {
@@ -42,6 +53,15 @@ export interface Api {
     typeDistribution: () => Promise<TypeSlice[]>
     difficultyDistribution: () => Promise<DifficultySlice[]>
     costPerRun: (limit?: number) => Promise<CostPoint[]>
+    criticCriteriaHeatmap: (limit?: number) => Promise<CriticHeatmap>
+    validatorFailureBreakdown: () => Promise<ValidatorFailure[]>
+    reframerClassBreakdown: () => Promise<ReframerClassSlice[]>
+    cumulativeCost: () => Promise<CumulativeCost>
+    costPerAcceptedQuestion: () => Promise<CostPerQuestionPoint[]>
+    runHistory: () => Promise<RunHistoryRow[]>
+    tokenUsageByStage: (limit?: number) => Promise<TokenUsageByStage>
+    analyzerCacheHitRate: () => Promise<CacheHitRate>
+    sourceLinterStats: () => Promise<SourceLinterStats>
     filterOptions: () => Promise<FilterOptions>
     queryMcqs: (filter?: McqFilter) => Promise<QueryResult>
     status: () => Promise<DbStatus>
@@ -79,6 +99,14 @@ export interface Api {
     isRunning: () => Promise<boolean>
     start: (params: RunStartParams) => Promise<void>
     cancel: () => Promise<void>
+  }
+  evalset: {
+    list: () => Promise<EvalSetMeta[]>
+    load: (name: string) => Promise<EvalSet | null>
+    save: (set: EvalSet) => Promise<void>
+    delete: (name: string) => Promise<void>
+    export: (set: EvalSet, defaultName: string) => Promise<string | null>
+    import: () => Promise<EvalSet | null>
   }
   onPipelineEvent: (
     cb: (e: PipelineEvent | ProcessExitEvent) => void,

@@ -15,6 +15,18 @@ const api = {
     difficultyDistribution: () =>
       ipcRenderer.invoke('db:difficultyDistribution'),
     costPerRun: (limit?: number) => ipcRenderer.invoke('db:costPerRun', limit),
+    criticCriteriaHeatmap: (limit?: number) =>
+      ipcRenderer.invoke('db:criticCriteriaHeatmap', limit),
+    validatorFailureBreakdown: () =>
+      ipcRenderer.invoke('db:validatorFailureBreakdown'),
+    reframerClassBreakdown: () => ipcRenderer.invoke('db:reframerClassBreakdown'),
+    cumulativeCost: () => ipcRenderer.invoke('db:cumulativeCost'),
+    costPerAcceptedQuestion: () => ipcRenderer.invoke('db:costPerAcceptedQuestion'),
+    runHistory: () => ipcRenderer.invoke('db:runHistory'),
+    tokenUsageByStage: (limit?: number) =>
+      ipcRenderer.invoke('outputs:tokenUsageByStage', limit),
+    analyzerCacheHitRate: () => ipcRenderer.invoke('outputs:analyzerCacheHitRate'),
+    sourceLinterStats: () => ipcRenderer.invoke('outputs:sourceLinterStats'),
     filterOptions: () => ipcRenderer.invoke('db:filterOptions'),
     queryMcqs: (filter?: unknown) => ipcRenderer.invoke('db:queryMcqs', filter),
     status: () => ipcRenderer.invoke('db:status'),
@@ -32,6 +44,15 @@ const api = {
       ipcRenderer.on('supabase:event', listener)
       return () => ipcRenderer.removeListener('supabase:event', listener)
     },
+  },
+  evalset: {
+    list: () => ipcRenderer.invoke('evalset:list'),
+    load: (name: string) => ipcRenderer.invoke('evalset:load', name),
+    save: (set: unknown) => ipcRenderer.invoke('evalset:save', set),
+    delete: (name: string) => ipcRenderer.invoke('evalset:delete', name),
+    export: (set: unknown, defaultName: string) =>
+      ipcRenderer.invoke('evalset:export', set, defaultName),
+    import: () => ipcRenderer.invoke('evalset:import'),
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),

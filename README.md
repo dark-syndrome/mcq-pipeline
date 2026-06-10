@@ -1196,8 +1196,13 @@ and Supabase push through the Python dedup gate). All reads use `sql.js` read-on
 now has all four sub-tabs: Overview (4 charts), Quality (validator failure bar, reframer-class pie,
 critic-criteria heatmap, source-linter stats table), Cost & Tokens (cumulative cost trend with
 regression forecast, cache-hit-rate stat card, token-usage stacked bar, cost-per-question scatter),
-and Run History (sortable/filterable table with per-run Inspect drawer + JSON export). Remaining: the
-Eval Set tab only.
+and Run History (sortable/filterable table with per-run Inspect drawer + JSON export). The **Eval Set**
+tab is fully implemented: create named question sets from the DB (with difficulty/bloom/source-file
+filters + random or sequential fetch), browse and annotate questions (5-star rating, Correct/Wrong
+toggle, notes, collapsible source excerpt), table view (sortable by 7 columns), quality summary
+(Critic false-positive rate, avg rating, breakdown by difficulty and bloom), plus import/export JSON
+and delete. Eval sets are persisted as JSON files in `eval-sets/` (GUI-owned). All 10 build sessions
+are complete.
 
 ---
 
