@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 340" width="1320" height="340" font-family="'Segoe UI', Arial, sans-serif">
+
+  <!-- Background -->
+  <rect width="1320" height="340" fill="#0f1117"/>
+
+  <!-- ── Stage definitions ─────────────────────────────────────────────────
+       Each stage:  x, y=100, w=130, h=100
+       Arrows at mid-height y=150
+  ────────────────────────────────────────────────────────────────────────── -->
+
+  <!-- ① Source File -->
+  <rect x="20"  y="100" width="130" height="100" rx="8" fill="#1e2130" stroke="#4a5080" stroke-width="1.5"/>
+  <text x="85"  y="130" text-anchor="middle" font-size="11" fill="#8b9abf" font-weight="600" letter-spacing="0.5">INPUT</text>
+  <text x="85"  y="150" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">Source</text>
+  <text x="85"  y="168" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">File</text>
+  <text x="85"  y="188" text-anchor="middle" font-size="10" fill="#64748b">.md document</text>
+
+  <!-- arrow 1→2 -->
+  <line x1="150" y1="150" x2="178" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="178,145 188,150 178,155" fill="#334155"/>
+
+  <!-- ② Parser -->
+  <rect x="188" y="100" width="130" height="100" rx="8" fill="#1e2130" stroke="#4a5080" stroke-width="1.5"/>
+  <text x="253" y="130" text-anchor="middle" font-size="11" fill="#8b9abf" font-weight="600" letter-spacing="0.5">STAGE 0</text>
+  <text x="253" y="150" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">Parser</text>
+  <text x="253" y="168" text-anchor="middle" font-size="10" fill="#64748b">T1 headings</text>
+  <text x="253" y="181" text-anchor="middle" font-size="10" fill="#64748b">T2 summaries</text>
+  <text x="253" y="194" text-anchor="middle" font-size="10" fill="#64748b">T3 fingerprints</text>
+
+  <!-- arrow 2→3 -->
+  <line x1="318" y1="150" x2="346" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="346,145 356,150 346,155" fill="#334155"/>
+
+  <!-- ③ Linter Layer 1 -->
+  <rect x="356" y="100" width="130" height="100" rx="8" fill="#1e2130" stroke="#4a5080" stroke-width="1.5"/>
+  <text x="421" y="130" text-anchor="middle" font-size="11" fill="#8b9abf" font-weight="600" letter-spacing="0.5">STAGE 1</text>
+  <text x="421" y="150" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">Linter</text>
+  <text x="421" y="168" text-anchor="middle" font-size="10" fill="#64748b">word count</text>
+  <text x="421" y="181" text-anchor="middle" font-size="10" fill="#64748b">section count</text>
+  <text x="421" y="194" text-anchor="middle" font-size="10" fill="#64748b">term density</text>
+
+  <!-- abort arrow down from Linter -->
+  <line x1="421" y1="200" x2="421" y2="240" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="416,240 421,250 426,240" fill="#ef4444"/>
+  <text x="421" y="268" text-anchor="middle" font-size="10" fill="#ef4444">FAIL → abort</text>
+
+  <!-- arrow 3→4 -->
+  <line x1="486" y1="150" x2="514" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="514,145 524,150 514,155" fill="#334155"/>
+
+  <!-- ④ Analyzer -->
+  <rect x="524" y="100" width="130" height="100" rx="8" fill="#1a2040" stroke="#3b5bdb" stroke-width="1.5"/>
+  <text x="589" y="130" text-anchor="middle" font-size="11" fill="#7c8fdb" font-weight="600" letter-spacing="0.5">STAGE 2</text>
+  <text x="589" y="150" text-anchor="middle" font-size="14" fill="#a5b4fc" font-weight="700">Analyzer</text>
+  <text x="589" y="168" text-anchor="middle" font-size="10" fill="#64748b">concept map</text>
+  <text x="589" y="181" text-anchor="middle" font-size="10" fill="#64748b">LLM · cached</text>
+  <text x="589" y="194" text-anchor="middle" font-size="10" fill="#64748b">MD5 keyed</text>
+
+  <!-- arrow 4→5 -->
+  <line x1="654" y1="150" x2="682" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="682,145 692,150 682,155" fill="#334155"/>
+
+  <!-- ⑤ Linter Layer 2 -->
+  <rect x="692" y="100" width="130" height="100" rx="8" fill="#1e2130" stroke="#4a5080" stroke-width="1.5"/>
+  <text x="757" y="130" text-anchor="middle" font-size="11" fill="#8b9abf" font-weight="600" letter-spacing="0.5">STAGE 3</text>
+  <text x="757" y="150" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">Density</text>
+  <text x="757" y="168" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">Check</text>
+  <text x="757" y="188" text-anchor="middle" font-size="10" fill="#64748b">concepts / sections</text>
+
+  <!-- abort arrow down from Density -->
+  <line x1="757" y1="200" x2="757" y2="240" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="752,240 757,250 762,240" fill="#ef4444"/>
+  <text x="757" y="268" text-anchor="middle" font-size="10" fill="#ef4444">FAIL → abort</text>
+
+  <!-- arrow 5→6 -->
+  <line x1="822" y1="150" x2="850" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="850,145 860,150 850,155" fill="#334155"/>
+
+  <!-- ⑥ Generator -->
+  <rect x="860" y="100" width="130" height="100" rx="8" fill="#1a2040" stroke="#3b5bdb" stroke-width="1.5"/>
+  <text x="925" y="130" text-anchor="middle" font-size="11" fill="#7c8fdb" font-weight="600" letter-spacing="0.5">STAGE 4</text>
+  <text x="925" y="150" text-anchor="middle" font-size="14" fill="#a5b4fc" font-weight="700">Generator</text>
+  <text x="925" y="168" text-anchor="middle" font-size="10" fill="#64748b">LLM · T2 input</text>
+  <text x="925" y="181" text-anchor="middle" font-size="10" fill="#64748b">over-generates</text>
+  <text x="925" y="194" text-anchor="middle" font-size="10" fill="#64748b">× factor</text>
+
+  <!-- arrow 6→7 -->
+  <line x1="990" y1="150" x2="1018" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="1018,145 1028,150 1018,155" fill="#334155"/>
+
+  <!-- ⑦ Critic -->
+  <rect x="1028" y="100" width="130" height="100" rx="8" fill="#1a2040" stroke="#3b5bdb" stroke-width="1.5"/>
+  <text x="1093" y="130" text-anchor="middle" font-size="11" fill="#7c8fdb" font-weight="600" letter-spacing="0.5">STAGE 5</text>
+  <text x="1093" y="150" text-anchor="middle" font-size="14" fill="#a5b4fc" font-weight="700">Critic</text>
+  <text x="1093" y="168" text-anchor="middle" font-size="10" fill="#64748b">LLM · T3 slicing</text>
+  <text x="1093" y="181" text-anchor="middle" font-size="10" fill="#64748b">source grounding</text>
+  <text x="1093" y="194" text-anchor="middle" font-size="10" fill="#64748b">quality gate</text>
+
+  <!-- retry loop arrow: Critic → Generator (arc below) -->
+  <path d="M 1093,200 C 1093,295 925,295 925,200" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <polygon points="920,200 925,210 930,200" fill="#f59e0b"/>
+  <text x="1009" y="316" text-anchor="middle" font-size="10" fill="#f59e0b">retry if accepted &lt; target</text>
+
+  <!-- arrow 7→8 -->
+  <line x1="1158" y1="150" x2="1186" y2="150" stroke="#334155" stroke-width="2"/>
+  <polygon points="1186,145 1196,150 1186,155" fill="#334155"/>
+
+  <!-- ⑧ Output -->
+  <rect x="1196" y="100" width="108" height="100" rx="8" fill="#14291a" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="1250" y="130" text-anchor="middle" font-size="11" fill="#4ade80" font-weight="600" letter-spacing="0.5">OUTPUT</text>
+  <text x="1250" y="150" text-anchor="middle" font-size="14" fill="#86efac" font-weight="700">Accepted</text>
+  <text x="1250" y="168" text-anchor="middle" font-size="14" fill="#86efac" font-weight="700">MCQs</text>
+  <text x="1250" y="188" text-anchor="middle" font-size="10" fill="#64748b">JSON + SQLite</text>
+
+  <!-- ── Legend ─────────────────────────────────────────────────────────── -->
+  <rect x="20" y="290" width="10" height="10" rx="2" fill="#1a2040" stroke="#3b5bdb" stroke-width="1.5"/>
+  <text x="36" y="300" font-size="10" fill="#8b9abf">LLM call</text>
+
+  <line x1="100" y1="295" x2="118" y2="295" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="124" y="300" font-size="10" fill="#8b9abf">Abort path</text>
+
+  <line x1="198" y1="295" x2="216" y2="295" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="222" y="300" font-size="10" fill="#8b9abf">Retry loop</text>
+
+</svg>

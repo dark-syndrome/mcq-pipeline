@@ -211,6 +211,22 @@ Input (.md file)
 | Critic input per MCQ | ~5 000 tok | ~600 tok | ~88% |
 | **Total for 10 MCQs** | **~105 000 tok** | **~27 500 tok** | **~74%** |
 
+### 2.2.1 Pipeline Stage Diagram
+
+The diagram below shows every stage of the MCQ generation pipeline left-to-right, including the two linter abort gates and the Generator → Critic retry loop.
+
+![MCQ Pipeline Diagram](docs/pipeline_diagram.svg)
+
+| Stage | Name | Cost | Description |
+|---|---|---|---|
+| 0 | **Parser** | Free | Splits source `.md` into T1 (headings), T2 (section summaries), T3 (fingerprints) |
+| 1 | **Linter L1** | Free | Static checks — word count, section count, term density. FAIL aborts before any API call. |
+| 2 | **Analyzer** | LLM × 1 | Extracts a full concept map. Result is MD5-keyed in SQLite — cache hit costs 0 tokens. |
+| 3 | **Density Check** | Free | Post-analyzer gate: `concepts / sections ≥ 0.2`. FAIL aborts. |
+| 4 | **Generator** | LLM × N | Over-generates candidates using T2 summaries. Repeats per Bloom level when per-Bloom mode is on. |
+| 5 | **Critic** | LLM × 1/MCQ | Evaluates each candidate against 13 quality criteria using T3 source slices. |
+| ↺ | **Retry loop** | — | Generator + Critic repeat until `accepted ≥ target` or `guarantee_n_retries` exhausted. |
+
 ### 2.3 GUI Architecture
 
 ```
@@ -1226,6 +1242,13 @@ These rules were added based on systematic analysis of output quality across two
 ---
 
 ## 16. Troubleshooting
+
+### GUI / Supabase
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Node.js 20 detected without native WebSocket support` in Electron console | `@supabase/realtime-js` requires native `WebSocket` (only available in Node ≥ 22). Electron embeds Node 20. | Already fixed: `ws` is passed as the transport in `gui/electron/paperQuery.ts`. If you see this after a fresh `npm install`, run `npm install ws` inside `gui/`. |
+| `Request Autofill.enable failed` in DevTools console | Harmless Chromium DevTools protocol mismatch — Electron's bundled Chromium doesn't expose the Autofill CDP domain. | Safe to ignore. Does not affect functionality. |
 
 ### Environment
 
