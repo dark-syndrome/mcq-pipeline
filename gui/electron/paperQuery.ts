@@ -91,6 +91,15 @@ export interface PaperQueryResult {
   source: 'supabase' | 'sqlite'
 }
 
+// Merge any number of string lists into one deduplicated, alphabetically sorted
+// list (blank/falsy entries dropped). Used to combine the topic-tag catalog with
+// the sub-topics that actually appear on generated questions.
+function mergeSorted(...lists: string[][]): string[] {
+  const seen = new Set<string>()
+  for (const list of lists) for (const v of list) if (v) seen.add(v)
+  return [...seen].sort((a, b) => a.localeCompare(b, 'en'))
+}
+
 // ─── Supabase path ────────────────────────────────────────────────────────────
 
 async function sbClient() {
@@ -154,9 +163,17 @@ async function sbFilterOptions(): Promise<PaperFilterOptions> {
       }
     } catch { /* ignore */ }
   }
-  subTopics.sort()
 
-  return { generations, topics, subTopics, source: 'supabase' }
+  // Union with the full topic-tag catalog (lives in local SQLite) so every
+  // defined topic is selectable for paper-building, not just those that already
+  // appear on a generated question.
+  const catalog = await db.listTopicTags()
+  return {
+    generations,
+    topics,
+    subTopics: mergeSorted(subTopics, catalog),
+    source: 'supabase',
+  }
 }
 
 async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult> {
@@ -306,9 +323,10 @@ function basename(p: string): string {
 }
 
 async function sqliteFilterOptions(): Promise<PaperFilterOptions> {
-  const [opts, subTopics] = await Promise.all([
+  const [opts, subTopicsOnQuestions, topicCatalog] = await Promise.all([
     db.filterOptions(),
     db.distinctSubTopics(),
+    db.listTopicTags(),
   ])
   return {
     generations: opts.runs.map((r) => ({
@@ -318,7 +336,9 @@ async function sqliteFilterOptions(): Promise<PaperFilterOptions> {
     topics: [
       ...new Set(opts.sourceFiles.map((f) => f.label.replace(/\.[^.]+$/, ''))),
     ],
-    subTopics,
+    // Every defined topic tag is selectable, merged with any sub-topics that
+    // already appear on generated questions.
+    subTopics: mergeSorted(subTopicsOnQuestions, topicCatalog),
     source: 'sqlite',
   }
 }

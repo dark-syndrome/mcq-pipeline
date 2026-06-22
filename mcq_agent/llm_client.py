@@ -67,13 +67,27 @@ class LLMClient(ABC):
         default_model: str,
         max_retries: int = 3,
         initial_backoff: float = 2.0,
+        use_headroom: bool = True,
     ) -> None:
         self._api_key = api_key
         self._default_model = default_model
         self._max_retries = max_retries
         self._initial_backoff = initial_backoff
+        self._use_headroom = use_headroom
         self._client = self._build_client()
         self._retryable = self._build_retryable_exceptions()
+
+        # Attempt to import headroom once at construction time so per-call
+        # overhead is just a boolean check, not a repeated import.
+        self._headroom_compress = None
+        if use_headroom:
+            try:
+                from headroom import compress as _hr_compress
+                self._headroom_compress = _hr_compress
+                log.info("headroom_enabled", note="input tokens will be compressed before each LLM call")
+            except ImportError:
+                log.warning("headroom_not_installed",
+                            hint="pip install headroom-ai  — falling back to uncompressed calls")
 
     @abstractmethod
     def _build_client(self):
@@ -120,6 +134,29 @@ class LLMClient(ABC):
         """
         resolved_model = model or self._default_model
 
+        # Compress the user prompt before it reaches the provider.
+        # We pass it as a single-message list so headroom's content router
+        # can pick SmartCrusher (JSON), CodeCompressor (code), or
+        # Kompress-base (prose) based on what the prompt actually contains.
+        # The system_prompt is left uncompressed — it is a static instruction
+        # template, not the large variable payload (T2/ConceptMap/few-shot).
+        effective_prompt = prompt
+        if self._headroom_compress is not None:
+            try:
+                messages_in = [{"role": "user", "content": prompt}]
+                compressed = self._headroom_compress(messages_in, model=resolved_model)
+                if compressed and compressed[0].get("content"):
+                    effective_prompt = compressed[0]["content"]
+                    tokens_before = len(prompt.split())   # rough word count for logging
+                    tokens_after  = len(effective_prompt.split())
+                    log.debug("headroom_compressed",
+                              words_before=tokens_before,
+                              words_after=tokens_after,
+                              reduction_pct=round((1 - tokens_after / max(tokens_before, 1)) * 100, 1))
+            except Exception as exc:
+                log.debug("headroom_compress_error", error=str(exc))
+                effective_prompt = prompt  # always fall back gracefully
+
         @retry(
             retry=retry_if_exception_type(self._retryable),
             stop=stop_after_attempt(self._max_retries + 1),
@@ -134,7 +171,7 @@ class LLMClient(ABC):
                 model=resolved_model,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                prompt=prompt,
+                prompt=effective_prompt,
                 system_prompt=system_prompt,
                 response_model=response_model,
             )
@@ -179,6 +216,9 @@ class LLMClient(ABC):
 
 class AnthropicClient(LLMClient):
     """LLM client backed by the Anthropic Claude API."""
+
+    def __init__(self, api_key, default_model, max_retries=3, initial_backoff=2.0, use_headroom=True):
+        super().__init__(api_key, default_model, max_retries, initial_backoff, use_headroom)
 
     def _build_client(self):
         from anthropic import Anthropic
@@ -237,6 +277,9 @@ class GroqClient(LLMClient):
     top-level parameter), and usage fields follow the OpenAI shape
     (``prompt_tokens`` / ``completion_tokens``).
     """
+
+    def __init__(self, api_key, default_model, max_retries=3, initial_backoff=2.0, use_headroom=True):
+        super().__init__(api_key, default_model, max_retries, initial_backoff, use_headroom)
 
     def _build_client(self):
         from groq import Groq
@@ -316,6 +359,9 @@ class OpenRouterClient(LLMClient):
 
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+    def __init__(self, api_key, default_model, max_retries=3, initial_backoff=2.0, use_headroom=True):
+        super().__init__(api_key, default_model, max_retries, initial_backoff, use_headroom)
+
     def _build_client(self):
         from openai import OpenAI
 
@@ -381,6 +427,7 @@ def make_client(
     default_model: str,
     max_retries: int = 3,
     initial_backoff: float = 2.0,
+    use_headroom: bool = True,
 ) -> LLMClient:
     """
     Build the right concrete client for *provider*.
@@ -392,6 +439,9 @@ def make_client(
         default_model:   Model identifier used when no override is passed.
         max_retries:     Maximum retry attempts on transient errors.
         initial_backoff: Initial backoff duration (seconds).
+        use_headroom:    Compress input tokens with headroom-ai before each
+                         API call.  Highest impact on Generator calls
+                         (ConceptMap JSON + T2 prose repeated every retry).
 
     Raises:
         ValueError: if *provider* is not recognised.
@@ -404,6 +454,7 @@ def make_client(
             default_model=default_model,
             max_retries=max_retries,
             initial_backoff=initial_backoff,
+            use_headroom=use_headroom,
         )
     if provider_norm == "groq":
         return GroqClient(
@@ -411,6 +462,7 @@ def make_client(
             default_model=default_model,
             max_retries=max_retries,
             initial_backoff=initial_backoff,
+            use_headroom=use_headroom,
         )
     if provider_norm == "openrouter":
         return OpenRouterClient(
@@ -418,6 +470,7 @@ def make_client(
             default_model=default_model,
             max_retries=max_retries,
             initial_backoff=initial_backoff,
+            use_headroom=use_headroom,
         )
 
     raise ValueError(

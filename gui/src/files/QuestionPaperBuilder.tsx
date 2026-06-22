@@ -409,6 +409,20 @@ export default function QuestionPaperBuilder() {
     setSubTopicRatios((prev) => ({ ...prev, [topic]: val }))
   }
 
+  // Select every available sub-topic at once and give each an equal default share.
+  const selectAllSubTopics = () => {
+    const all = filterOpts?.subTopics ?? []
+    if (all.length === 0) return
+    setSelectedSubTopics(all)
+    const share = Math.floor(100 / all.length)
+    const remainder = 100 - share * all.length
+    const ratios: Record<string, number> = {}
+    all.forEach((t, i) => {
+      ratios[t] = share + (i === all.length - 1 ? remainder : 0)
+    })
+    setSubTopicRatios(ratios)
+  }
+
   // Compute sub-topic allocations for the query.
   const subTopicAllocs =
     selectedSubTopics.length > 0
@@ -598,22 +612,46 @@ export default function QuestionPaperBuilder() {
 
               {/* Sub-topic Selection */}
               <div className="rounded-lg border border-border bg-surface p-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  Sub-topics
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Sub-topics
+                    {filterOpts && filterOpts.subTopics.length > 0 && (
+                      <span className="ml-1.5 normal-case text-[10px] text-muted/70">
+                        ({selectedSubTopics.length}/{filterOpts.subTopics.length})
+                      </span>
+                    )}
+                  </h4>
+                  {filterOpts && filterOpts.subTopics.length > 0 && (
+                    <button
+                      onClick={
+                        selectedSubTopics.length === filterOpts.subTopics.length
+                          ? () => {
+                              setSelectedSubTopics([])
+                              setSubTopicRatios({})
+                            }
+                          : selectAllSubTopics
+                      }
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      {selectedSubTopics.length === filterOpts.subTopics.length
+                        ? 'Clear all'
+                        : 'Select all'}
+                    </button>
+                  )}
+                </div>
 
                 {!filterOpts ? (
                   <p className="mt-2 text-xs text-muted">Loading…</p>
                 ) : filterOpts.subTopics.length === 0 ? (
                   <p className="mt-2 text-xs text-muted">
-                    No sub-topics found — run the pipeline first.
+                    No topics found — add a Topic Tag in the Run tab or run the pipeline first.
                   </p>
                 ) : (
                   <>
                     <p className="mt-1 text-[11px] text-muted">
                       Select sub-topics to include, then set the question ratio for each.
                     </p>
-                    <div className="mt-2 max-h-36 space-y-0.5 overflow-y-auto">
+                    <div className="mt-2 max-h-56 space-y-0.5 overflow-y-auto pr-1">
                       {filterOpts.subTopics.map((t) => (
                         <label key={t} className="flex items-center gap-2 text-xs">
                           <input

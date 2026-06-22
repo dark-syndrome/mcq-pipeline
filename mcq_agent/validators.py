@@ -66,19 +66,13 @@ def validate_uniqueness(
     total = len(mcq.options)
 
     if question_type == QuestionType.ORDERING:
-        if correct_count > 0:
+        if not mcq.ordering_statements:
+            return False, "ORDERING question is missing ordering_statements"
+        if correct_count != 1:
             return (
                 False,
-                "ORDERING questions must have is_correct=False on all options — "
-                "the correct sequence lives in correct_order",
-            )
-        if not mcq.correct_order:
-            return False, "ORDERING question is missing correct_order"
-        labels = {opt.label for opt in mcq.options}
-        if set(mcq.correct_order) != labels:
-            return (
-                False,
-                "correct_order labels must match option labels exactly",
+                f"ORDERING question must have exactly 1 correct option "
+                f"(the correct sequence), found {correct_count}",
             )
         return True, None
 
@@ -117,9 +111,8 @@ def validate_distractor_rationales(mcq: MCQ) -> tuple[bool, str | None]:
     """
     Check that every incorrect option has a non-empty ``distractor_rationale``.
 
-    For ORDERING questions, all options are technically "incorrect" (no single
-    correct answer) but each should still explain why a learner might misplace
-    that step.
+    For ORDERING questions, the three incorrect sequence options (is_correct=False)
+    each need a distractor_rationale explaining why a learner might choose that order.
     """
     missing = [
         opt.label
@@ -262,9 +255,8 @@ def shuffle_correct_answer_positions(mcqs: list[MCQ]) -> list[MCQ]:
     For each MCQ, randomly reorder the options list while preserving all field
     values. Labels (A, B, C, D) are reassigned in order after shuffling.
 
-    Note: This does NOT modify ``correct_order`` for ORDERING questions —
-    those are left untouched since option labels encode the content, not a
-    correctness position.
+    ORDERING questions are shuffled like any other type: the correct sequence
+    option moves to a random position and labels are reassigned.
 
     Args:
         mcqs: List of MCQs to shuffle in-place.
@@ -276,10 +268,6 @@ def shuffle_correct_answer_positions(mcqs: list[MCQ]) -> list[MCQ]:
 
     shuffled_mcqs: list[MCQ] = []
     for mcq in mcqs:
-        if mcq.question_type.value == "ordering":
-            shuffled_mcqs.append(mcq)
-            continue
-
         options_copy = list(mcq.options)
         random.shuffle(options_copy)
 

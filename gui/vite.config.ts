@@ -12,7 +12,14 @@ export default defineConfig({
         entry: 'electron/main.ts',
         // sql.js + yaml stay external so they load from node_modules at runtime
         // (sql.js needs its .wasm resolved via require.resolve).
-        vite: { build: { rollupOptions: { external: ['sql.js', 'yaml'] } } },
+        vite: {
+          build: {
+            rollupOptions: {
+              external: (id: string) =>
+                ['sql.js', 'yaml'].includes(id) || id.startsWith('@supabase/'),
+            },
+          },
+        },
       },
       preload: { input: 'electron/preload.ts' },
       renderer: {},

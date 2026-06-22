@@ -13,6 +13,7 @@ export default function EvalSetTab() {
   const [view, setView] = useState<View>('browse')
   const [showCreate, setShowCreate] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [promoting, setPromoting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Debounce timer for auto-save on annotation changes
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -77,6 +78,44 @@ export default function EvalSetTab() {
     if (!current || !window.api) return
     const defaultName = `${current.name}_${current.created_at.slice(0, 10)}`
     await window.api.evalset.export(current, defaultName)
+  }
+
+  // Promote the top-rated, confirmed-correct questions into the generator's
+  // few-shot pool so future generations are steered by what humans approved.
+  const MIN_PROMOTE_RATING = 4
+  async function handlePromote() {
+    if (!current || !window.api) return
+    const eligible = current.questions.filter(
+      (q) => q.annotation.confirmed === true && q.annotation.rating >= MIN_PROMOTE_RATING,
+    )
+    if (eligible.length === 0) {
+      // eslint-disable-next-line no-alert
+      alert(
+        'No questions are rated ≥4 and marked Correct yet. Rate your best questions first in Browse & Annotate.',
+      )
+      return
+    }
+    // eslint-disable-next-line no-alert
+    if (
+      !window.confirm(
+        `Promote ${eligible.length} top question${eligible.length === 1 ? '' : 's'} (rated ≥${MIN_PROMOTE_RATING} & marked Correct) into few_shot_examples.json? They steer all future generations. Duplicates are skipped and the file is backed up first.`,
+      )
+    )
+      return
+    setPromoting(true)
+    try {
+      const res = await window.api.evalset.promoteFewShot(current.questions, MIN_PROMOTE_RATING)
+      // eslint-disable-next-line no-alert
+      alert(
+        `Added ${res.added} example${res.added === 1 ? '' : 's'} to few-shot${
+          res.skipped ? ` · ${res.skipped} skipped as duplicate${res.skipped === 1 ? '' : 's'}` : ''
+        }.`,
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPromoting(false)
+    }
   }
 
   async function handleDelete() {
@@ -152,6 +191,14 @@ export default function EvalSetTab() {
         </button>
         {current && (
           <>
+            <button
+              onClick={handlePromote}
+              disabled={promoting}
+              title="Add your top-rated, confirmed-correct questions to the generator's few-shot pool"
+              className="h-9 rounded border border-primary/40 px-4 text-sm text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              {promoting ? 'Promoting…' : '★ Promote to few-shot'}
+            </button>
             <button
               onClick={handleExport}
               className="h-9 rounded border border-border px-4 text-sm text-muted hover:text-text"

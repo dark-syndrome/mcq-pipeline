@@ -1,3 +1,6 @@
+# Token compression — wraps every LLM call to reduce input tokens (60-92% on JSON/prose)
+headroom-ai>=0.22.0
+
 # LLM SDKs — all installed; config.yaml picks which one to use at runtime
 groq>=0.11.0
 anthropic>=0.39.0

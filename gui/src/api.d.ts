@@ -9,6 +9,7 @@ import type {
   DbHealth,
   DbStatus,
   DifficultySlice,
+  EvalQuestion,
   EvalSet,
   EvalSetMeta,
   ExportOptions,
@@ -122,6 +123,10 @@ export interface Api {
     delete: (name: string) => Promise<void>
     export: (set: EvalSet, defaultName: string) => Promise<string | null>
     import: () => Promise<EvalSet | null>
+    promoteFewShot: (
+      questions: EvalQuestion[],
+      minRating: number,
+    ) => Promise<{ added: number; skipped: number; eligible: number; path: string }>
   }
   onPipelineEvent: (
     cb: (e: PipelineEvent | ProcessExitEvent) => void,

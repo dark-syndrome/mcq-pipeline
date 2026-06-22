@@ -407,6 +407,12 @@ def generate(
             if subtopics else []
         )
 
+        # Persist every chosen topic tag to the catalog (not just --topic-tag) so
+        # they all appear in future prompts and the GUI paper builder. Idempotent.
+        for st in subtopic_list:
+            if st and st != "UNTAGGED":
+                storage.add_topic_tag(st, db_path)
+
         run = pipeline_mod.run_pipeline(
             input_file=input,
             config=mcq_config,

@@ -27,6 +27,8 @@ const api = {
       ipcRenderer.invoke('outputs:tokenUsageByStage', limit),
     analyzerCacheHitRate: () => ipcRenderer.invoke('outputs:analyzerCacheHitRate'),
     sourceLinterStats: () => ipcRenderer.invoke('outputs:sourceLinterStats'),
+    topicTags: () => ipcRenderer.invoke('db:topicTags'),
+    courses: () => ipcRenderer.invoke('db:courses'),
     filterOptions: () => ipcRenderer.invoke('db:filterOptions'),
     queryMcqs: (filter?: unknown) => ipcRenderer.invoke('db:queryMcqs', filter),
     status: () => ipcRenderer.invoke('db:status'),
@@ -36,6 +38,10 @@ const api = {
   export: {
     run: (rows: unknown, opts: unknown, defaultName: string) =>
       ipcRenderer.invoke('export:run', rows, opts, defaultName),
+  },
+  paper: {
+    filterOptions: () => ipcRenderer.invoke('paper:filterOptions'),
+    queryMcqs: (params: unknown) => ipcRenderer.invoke('paper:queryMcqs', params),
   },
   supabase: {
     push: (opts: unknown) => ipcRenderer.invoke('supabase:push', opts),
@@ -53,6 +59,8 @@ const api = {
     export: (set: unknown, defaultName: string) =>
       ipcRenderer.invoke('evalset:export', set, defaultName),
     import: () => ipcRenderer.invoke('evalset:import'),
+    promoteFewShot: (questions: unknown, minRating: number) =>
+      ipcRenderer.invoke('evalset:promoteFewShot', questions, minRating),
   },
   config: {
     get: () => ipcRenderer.invoke('config:get'),

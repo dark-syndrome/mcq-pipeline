@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   DbHealth,
   DbStatus,
@@ -31,6 +31,12 @@ export default function DbManagementPanel({
   const [runId, setRunId] = useState('')
   const [pushLog, setPushLog] = useState<string[]>([])
   const [pushing, setPushing] = useState(false)
+  // Holds the active push event-listener unsubscribe so we can tear it down on
+  // unmount (e.g. switching tabs mid-push) and never leak an ipcRenderer
+  // listener. The push subprocess itself keeps running and is reaped on window
+  // close (main.ts); it is short and the dedup gate makes a re-push safe.
+  const unsubRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => unsubRef.current?.(), [])
 
   const loadStatus = () => window.api?.db.status().then(setStatus)
   useEffect(() => {
@@ -63,11 +69,17 @@ export default function DbManagementPanel({
     }
   }
 
+  const stopPushListener = () => {
+    unsubRef.current?.()
+    unsubRef.current = null
+  }
+
   const onPush = (dryRun: boolean) => {
     if (pushing) return
     setPushing(true)
     setPushLog([dryRun ? 'Computing dedup preview…' : 'Pushing to Supabase…'])
-    const unsub = window.api.supabase.onEvent((e: SupabasePushEvent) => {
+    stopPushListener() // drop any stale listener before opening a new one
+    unsubRef.current = window.api.supabase.onEvent((e: SupabasePushEvent) => {
       if (e.event === 'push_start') {
         setPushLog((l) => [...l, `Submitting ${e.submitted} (threshold ${e.threshold})`])
       } else if (e.event === 'push_preview' || e.event === 'push_pushed') {
@@ -86,7 +98,7 @@ export default function DbManagementPanel({
           setPushLog((l) => [...l, `Pushed ${e.pushed} · ${e.filtered} skipped.`])
       } else if (e.event === 'process_exit') {
         setPushing(false)
-        unsub()
+        stopPushListener()
       } else if (e.event === 'error') {
         setPushLog((l) => [...l, `Error: ${e.message}`])
       }
@@ -94,7 +106,7 @@ export default function DbManagementPanel({
     window.api.supabase.push({ runId: runId || undefined, dryRun }).catch((err) => {
       setPushLog((l) => [...l, String(err)])
       setPushing(false)
-      unsub()
+      stopPushListener()
     })
   }
 

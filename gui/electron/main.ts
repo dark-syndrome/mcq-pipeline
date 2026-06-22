@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
+import { cancelRun, isRunning } from './sidecar'
 
 // Window chrome only. IPC (Python sidecar + better-sqlite3) is added in Session 2.
 function createWindow() {
@@ -17,6 +18,14 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  })
+
+  // Single, reliable cleanup: if any Python sidecar (generation run OR Supabase
+  // push) is still running when the window closes, kill it so it doesn't keep
+  // consuming API quota as an orphan. Registered once per window — not per run —
+  // so listeners never accumulate and it covers every subprocess flow.
+  win.on('closed', () => {
+    if (isRunning()) cancelRun()
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {

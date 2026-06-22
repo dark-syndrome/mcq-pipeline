@@ -3,6 +3,7 @@ import FilterBuilder from '../files/FilterBuilder'
 import ResultsPreview from '../files/ResultsPreview'
 import ExportPanel from '../files/ExportPanel'
 import DbManagementPanel from '../files/DbManagementPanel'
+import QuestionPaperBuilder from '../files/QuestionPaperBuilder'
 import { useStore } from '../store'
 import type { FilterOptions, McqFilter, QueryResult } from '../types'
 
@@ -99,6 +100,9 @@ export default function FilesTab() {
         runs={options?.runs ?? []}
         supabaseEnabled={supabaseEnabled}
       />
+
+      {/* Question Paper Builder (§5.8) */}
+      <QuestionPaperBuilder />
     </div>
   )
 }

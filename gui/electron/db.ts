@@ -268,6 +268,29 @@ export async function distinctSubTopics(): Promise<string[]> {
   ).map((r) => String(r.st))
 }
 
+// Authoritative full mcq_json keyed by row id — used to recover fields the eval
+// set JSON doesn't carry (notably stem_pattern) when promoting to few-shot.
+export async function mcqJsonByIds(
+  ids: number[],
+): Promise<Record<number, Record<string, unknown>>> {
+  const d = await ensure()
+  if (!d || ids.length === 0) return {}
+  const rows = rowsToObjectsParams(
+    d,
+    `SELECT id, mcq_json FROM mcqs WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ids,
+  )
+  const out: Record<number, Record<string, unknown>> = {}
+  for (const r of rows) {
+    try {
+      out[Number(r.id)] = JSON.parse(String(r.mcq_json))
+    } catch {
+      /* skip unparseable */
+    }
+  }
+  return out
+}
+
 export interface McqFilter {
   sourceFiles?: string[]
   runIds?: string[]

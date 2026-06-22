@@ -15,15 +15,13 @@ export default function RunTab() {
   const [runParams, setRunParams] = useState<RunStartParams | null>(null)
   const [availableTags, setAvailableTags] = useState<string[]>([])
   const [availableCourses, setAvailableCourses] = useState<string[]>([])
-  const [availableSubTopics, setAvailableSubTopics] = useState<string[]>([])
   const [config, setConfig] = useState<RunConfig>({
     count: 10,
     difficulty: 'medium',
     types: ['single_correct'],
     topic: '',
-    topicTag: '',
+    topicTags: [],
     runName: '',
-    subtopics: [],
     course: '',
     isPublic: true,
   })
@@ -53,9 +51,6 @@ export default function RunTab() {
           setConfig((c) => ({ ...c, course: c.course || courses[0] }))
         }
       }
-    }).catch(() => {})
-    window.api?.paper.filterOptions().then((opts) => {
-      if (active) setAvailableSubTopics(opts.subTopics)
     }).catch(() => {})
     return () => { active = false }
   }, [])
@@ -97,9 +92,11 @@ export default function RunTab() {
       difficulty: config.difficulty,
       type: config.types.length === 1 ? config.types[0] : undefined,
       topic: config.topic || undefined,
-      topicTag: config.topicTag || undefined,
+      // First tag is the run-level label and LLM fallback; all tags feed --subtopics
+      // so the LLM assigns one per question when multiple are present.
+      topicTag: config.topicTags[0] || undefined,
+      subtopics: config.topicTags.length ? config.topicTags : undefined,
       runName: config.runName || undefined,
-      subtopics: config.subtopics.length ? config.subtopics : undefined,
       course: config.course || undefined,
       isPublic: config.isPublic,
     })
@@ -141,7 +138,6 @@ export default function RunTab() {
           onGenerate={onGenerate}
           availableTags={availableTags}
           availableCourses={availableCourses}
-          availableSubTopics={availableSubTopics}
         />
       </div>
     </div>

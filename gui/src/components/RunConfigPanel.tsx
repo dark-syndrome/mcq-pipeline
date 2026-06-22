@@ -6,9 +6,8 @@ export interface RunConfig {
   difficulty: Difficulty
   types: QuestionType[]
   topic: string
-  topicTag: string
+  topicTags: string[]
   runName: string
-  subtopics: string[]
   course: string
   isPublic: boolean
 }
@@ -29,7 +28,6 @@ interface Props {
   notice?: string | null
   availableTags?: string[]
   availableCourses?: string[]
-  availableSubTopics?: string[]
 }
 
 // Combobox: shows a dropdown of existing options but also allows free-text.
@@ -94,7 +92,7 @@ function Combobox({
   )
 }
 
-// Chip-style multi-value input for subtopic tags.
+// Chip-style multi-value input for topic tags.
 function ChipInput({
   values,
   suggestions,
@@ -109,6 +107,7 @@ function ChipInput({
   const [input, setInput] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -125,9 +124,14 @@ function ChipInput({
     if (tag && !values.includes(tag)) onChange([...values, tag])
     setInput('')
     setOpen(false)
+    // Keep focus in the input so the user can immediately type the next tag.
+    requestAnimationFrame(() => inputRef.current?.focus())
   }
 
-  const remove = (tag: string) => onChange(values.filter((v) => v !== tag))
+  const remove = (tag: string) => {
+    onChange(values.filter((v) => v !== tag))
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
 
   const filtered = suggestions.filter(
     (s) => s.toLowerCase().includes(input.toLowerCase()) && !values.includes(s),
@@ -144,6 +148,7 @@ function ChipInput({
             >
               {tag}
               <button
+                type="button"
                 onClick={() => remove(tag)}
                 className="ml-0.5 leading-none text-primary/60 hover:text-primary"
               >
@@ -155,19 +160,26 @@ function ChipInput({
       )}
       <div className="flex gap-1">
         <input
+          ref={inputRef}
           value={input}
           onChange={(e) => { setInput(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
+            if (e.key === 'Backspace' && !input && values.length > 0) {
+              e.preventDefault()
+              remove(values[values.length - 1])
+              return
+            }
             if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
               e.preventDefault()
               add(input)
             }
           }}
-          placeholder={placeholder}
+          placeholder={values.length === 0 ? placeholder : 'Add another…'}
           className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-primary"
         />
         <button
+          type="button"
           onClick={() => { if (input.trim()) add(input) }}
           className="rounded-lg border border-border px-3 py-2 text-sm text-muted hover:text-text"
         >
@@ -200,7 +212,6 @@ export default function RunConfigPanel({
   notice,
   availableTags = [],
   availableCourses = [],
-  availableSubTopics = [],
 }: Props) {
   const toggleType = (t: QuestionType) => {
     const next = config.types.includes(t)
@@ -275,26 +286,19 @@ export default function RunConfigPanel({
         />
 
         <label className="mt-3 block text-sm text-muted">
-          Topic Tag
-          <span className="ml-1 text-xs text-muted/60">(select or type new)</span>
-        </label>
-        <Combobox
-          value={config.topicTag}
-          options={availableTags}
-          placeholder="e.g. SLAM"
-          onChange={(v) => onChange({ topicTag: v.toUpperCase().replace(/ /g, '_') })}
-        />
-
-        <label className="mt-3 block text-sm text-muted">
-          Sub-topics
-          <span className="ml-1 text-xs text-muted/60">(Enter or comma to add · each question is tagged to the best match)</span>
+          Topic Tags
+          <span className="ml-1 text-xs text-muted/60">
+            {config.topicTags.length > 1
+              ? '— LLM assigns one per question'
+              : '— add multiple for per-question LLM assignment'}
+          </span>
         </label>
         <div className="mt-1">
           <ChipInput
-            values={config.subtopics}
-            suggestions={availableSubTopics}
-            placeholder="e.g. MQTT_PROTOCOL"
-            onChange={(v) => onChange({ subtopics: v })}
+            values={config.topicTags}
+            suggestions={availableTags}
+            placeholder="Type a tag and press Enter, e.g. SLAM"
+            onChange={(v) => onChange({ topicTags: v })}
           />
         </div>
 
@@ -328,17 +332,19 @@ export default function RunConfigPanel({
         </label>
 
         {/* Tag preview */}
-        {config.topicTag && (
+        {config.topicTags.length > 0 && (
           <div className="mt-3 rounded-lg border border-border bg-bg px-3 py-2">
             <p className="mb-1 text-xs text-muted">
               Tag preview per question
-              {config.subtopics.length > 0 && (
-                <span className="ml-1 text-primary/80">(sub_topic assigned by LLM)</span>
+              {config.topicTags.length > 1 && (
+                <span className="ml-1 text-primary/80">(topic assigned by LLM)</span>
               )}
             </p>
             <div className="flex flex-wrap gap-1">
               {[
-                config.subtopics.length > 0 ? `<one of ${config.subtopics.length} sub-topics>` : config.topicTag,
+                config.topicTags.length > 1
+                  ? `<one of ${config.topicTags.length} topics>`
+                  : config.topicTags[0],
                 '<BLOOM_LEVEL>',
                 ...(config.isPublic ? ['IS_PUBLIC'] : []),
                 config.course || '…',

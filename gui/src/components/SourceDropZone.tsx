@@ -40,14 +40,22 @@ export default function SourceDropZone({ file, linting, onSelect, onError }: Pro
     setDragging(false)
     const f = e.dataTransfer.files?.[0]
     if (!f) return
-    accept(window.api.getPathForFile(f), f.name, f.size)
+    try {
+      accept(window.api.getPathForFile(f), f.name, f.size)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const browse = async () => {
-    const path = await window.api.dialog.openMarkdown()
-    if (!path) return
-    const name = path.split(/[\\/]/).pop() ?? path
-    accept(path, name, 0) // size not reported by the dialog; limit not enforced here
+    try {
+      const path = await window.api.dialog.openMarkdown()
+      if (!path) return
+      const name = path.split(/[\\/]/).pop() ?? path
+      accept(path, name, 0) // size not reported by the dialog; limit not enforced here
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   return (

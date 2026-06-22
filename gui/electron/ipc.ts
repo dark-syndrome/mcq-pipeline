@@ -102,8 +102,8 @@ export function registerIpc(): void {
   ipcMain.handle('run:start', (e, params: RunParams) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) throw new Error('No window for this run request.')
-    // Kill the subprocess if the window closes mid-run so it doesn't consume API quota.
-    win.once('closed', () => { if (isRunning()) cancelRun() })
+    // Subprocess cleanup on window close is registered once per window in main.ts
+    // (covers both the run and the Supabase push), so nothing is wired here.
     startRun(win, params)
   })
   ipcMain.handle('run:cancel', () => cancelRun())
@@ -195,6 +195,19 @@ export function registerIpc(): void {
       return null
     }
   })
+
+  // Promote top-rated, confirmed-correct questions into few_shot_examples.json.
+  // We recover the authoritative source fields (stem_pattern) from the DB by id.
+  ipcMain.handle(
+    'evalset:promoteFewShot',
+    async (_e, questions: evalset.EvalQuestion[], minRating: number) => {
+      const ids = questions
+        .filter((q) => q.annotation?.confirmed === true && (q.annotation?.rating ?? 0) >= minRating)
+        .map((q) => q.id)
+      const dbMap = await db.mcqJsonByIds(ids)
+      return evalset.promoteToFewShot(questions, dbMap, minRating)
+    },
+  )
 
   // --- Question Paper Builder (§5.8) ---
   ipcMain.handle('paper:filterOptions', () => getPaperFilterOptions())
