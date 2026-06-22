@@ -13,14 +13,22 @@ export default function RunTab() {
   const [report, setReport] = useState<LintReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [runParams, setRunParams] = useState<RunStartParams | null>(null)
+  const [availableTags, setAvailableTags] = useState<string[]>([])
+  const [availableCourses, setAvailableCourses] = useState<string[]>([])
+  const [availableSubTopics, setAvailableSubTopics] = useState<string[]>([])
   const [config, setConfig] = useState<RunConfig>({
     count: 10,
     difficulty: 'medium',
     types: ['single_correct'],
     topic: '',
+    topicTag: '',
+    runName: '',
+    subtopics: [],
+    course: '',
+    isPublic: true,
   })
 
-  // Seed run defaults from config.yaml.
+  // Load defaults from config.yaml and tag catalogs from the DB.
   useEffect(() => {
     let active = true
     window.api?.config.get().then((cfg) => {
@@ -32,9 +40,24 @@ export default function RunTab() {
         difficulty: cfg.defaults.difficulty,
       }))
     })
-    return () => {
-      active = false
-    }
+    // Tags + courses come from the DB — may be empty on first launch before
+    // any Python run has been made (DB not yet created).
+    window.api?.db.topicTags().then((tags) => {
+      if (active) setAvailableTags(tags)
+    }).catch(() => {})
+    window.api?.db.courses().then((courses) => {
+      if (active) {
+        setAvailableCourses(courses)
+        // Pre-fill course with the first known course if none set yet.
+        if (courses.length > 0) {
+          setConfig((c) => ({ ...c, course: c.course || courses[0] }))
+        }
+      }
+    }).catch(() => {})
+    window.api?.paper.filterOptions().then((opts) => {
+      if (active) setAvailableSubTopics(opts.subTopics)
+    }).catch(() => {})
+    return () => { active = false }
   }, [])
 
   const onSelect = async (f: SelectedFile) => {
@@ -44,6 +67,7 @@ export default function RunTab() {
     setConfig((c) => ({
       ...c,
       topic: c.topic || titleCase(f.name.replace(/\.(md|markdown)$/i, '')),
+      runName: c.runName || titleCase(f.name.replace(/\.(md|markdown)$/i, '')),
     }))
     setLinting(true)
     try {
@@ -71,14 +95,16 @@ export default function RunTab() {
       input: file.path,
       count: config.count,
       difficulty: config.difficulty,
-      // The CLI takes a single --type; only override when one is selected,
-      // otherwise let config.yaml (mixed_question_types) decide.
       type: config.types.length === 1 ? config.types[0] : undefined,
       topic: config.topic || undefined,
+      topicTag: config.topicTag || undefined,
+      runName: config.runName || undefined,
+      subtopics: config.subtopics.length ? config.subtopics : undefined,
+      course: config.course || undefined,
+      isPublic: config.isPublic,
     })
   }
 
-  // Phase 3 replaces the upload + config view during/after execution.
   if (runParams) {
     return <RunExecution params={runParams} onReset={() => setRunParams(null)} />
   }
@@ -91,7 +117,7 @@ export default function RunTab() {
         the pipeline.
       </p>
 
-      <div className="mt-8 grid grid-cols-[1fr_360px] gap-6">
+      <div className="mt-8 grid grid-cols-[1fr_380px] gap-6">
         <div className="space-y-4">
           <SourceDropZone
             file={file}
@@ -113,6 +139,9 @@ export default function RunTab() {
           estimate={estimate}
           canGenerate={canGenerate}
           onGenerate={onGenerate}
+          availableTags={availableTags}
+          availableCourses={availableCourses}
+          availableSubTopics={availableSubTopics}
         />
       </div>
     </div>
@@ -123,8 +152,6 @@ function titleCase(s: string): string {
   return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
 }
 
-// Heuristic pre-flight estimate (§6.1) — not a guarantee. Models the dominant
-// cost: an over-generation batch of candidates filtered by the Critic.
 function estimateCost(
   sourceWords: number,
   count: number,
@@ -134,8 +161,8 @@ function estimateCost(
   const priceOut = (cfg?.pricing.output ?? 0.6) / 1_000_000
   const factor = cfg?.defaults.over_generation_factor ?? 2.0
   const candidates = Math.ceil(count * factor)
-  const estIn = sourceWords * 1.3 + candidates * 320 // analyzer + amortized gen/critic prompt
-  const estOut = candidates * 220 // ~per-MCQ JSON output
+  const estIn = sourceWords * 1.3 + candidates * 320
+  const estOut = candidates * 220
   const cost = estIn * priceIn + estOut * priceOut
   return { tokens: estIn + estOut, cost }
 }

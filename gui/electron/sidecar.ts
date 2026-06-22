@@ -15,6 +15,11 @@ export interface RunParams {
   difficulty?: string
   type?: string
   topic?: string
+  topicTag?: string
+  runName?: string
+  subtopics?: string[]
+  course?: string
+  isPublic?: boolean
   outputDir?: string
 }
 
@@ -87,6 +92,11 @@ export function startRun(win: BrowserWindow, params: RunParams): void {
   if (params.difficulty) args.push('--difficulty', params.difficulty)
   if (params.type) args.push('--type', params.type)
   if (params.topic) args.push('--topic', params.topic)
+  if (params.topicTag) args.push('--topic-tag', params.topicTag)
+  if (params.runName) args.push('--run-name', params.runName)
+  if (params.subtopics?.length) args.push('--subtopics', params.subtopics.join(','))
+  if (params.course) args.push('--course', params.course)
+  if (params.isPublic === false) args.push('--no-public')
   // Absolute output dir so run_complete.output_files are absolute paths the
   // renderer can save/reveal regardless of the main process cwd.
   args.push('--output-dir', params.outputDir ?? path.join(REPO_ROOT, 'output'))

@@ -243,15 +243,29 @@ export async function filterOptions(): Promise<{
   ).map((r) => String(r.h))
   const runs = rowsToObjects(
     d,
-    `SELECT run_id, generation_number, input_file
+    `SELECT run_id, generation_number, input_file, run_name
        FROM runs
    ORDER BY generation_number DESC`,
   ).map((r) => ({
     run_id: String(r.run_id),
     generation_number: Number(r.generation_number),
-    label: `Gen #${r.generation_number} · ${basename(String(r.input_file))}`,
+    label: r.run_name
+      ? String(r.run_name)
+      : `Gen #${r.generation_number} · ${basename(String(r.input_file))}`,
   }))
   return { sourceFiles: files, sourceHeadings: headings, runs }
+}
+
+export async function distinctSubTopics(): Promise<string[]> {
+  const d = await ensure()
+  if (!d) return []
+  return rowsToObjects(
+    d,
+    `SELECT DISTINCT json_extract(mcq_json,'$.sub_topic') AS st
+       FROM mcqs
+      WHERE passed = 1 AND st IS NOT NULL AND st <> ''
+   ORDER BY st`,
+  ).map((r) => String(r.st))
 }
 
 export interface McqFilter {
@@ -261,6 +275,7 @@ export interface McqFilter {
   blooms?: string[]
   types?: string[]
   sourceHeadings?: string[]
+  subTopics?: string[]
   dateFrom?: string
   dateTo?: string
   passedOnly?: boolean
@@ -285,6 +300,7 @@ function buildWhere(f: McqFilter): { clause: string; params: Param[] } {
   inList(`json_extract(m.mcq_json,'$.bloom_level')`, f.blooms)
   inList(`json_extract(m.mcq_json,'$.question_type')`, f.types)
   inList(`json_extract(m.mcq_json,'$.source_heading')`, f.sourceHeadings)
+  inList(`json_extract(m.mcq_json,'$.sub_topic')`, f.subTopics)
   inList('r.input_file', f.sourceFiles)
   inList('m.run_id', f.runIds)
   if (f.dateFrom) {
@@ -333,6 +349,8 @@ function parseRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
       bloom_level: String(mcq.bloom_level ?? ''),
       difficulty: String(mcq.difficulty ?? ''),
       question_type: String(mcq.question_type ?? ''),
+      sub_topic: (mcq.sub_topic as string) ?? null,
+      tags: Array.isArray(mcq.tags) ? (mcq.tags as string[]) : [],
     }
   })
 }
@@ -731,6 +749,32 @@ export async function dbStatus(): Promise<{
   return { exists, path: DB_PATH, sizeBytes, counts, conceptMaps }
 }
 
+// --- Tagging catalog (topic_tags / courses tables) ---
+
+export async function listTopicTags(): Promise<string[]> {
+  const d = await ensure()
+  if (!d) return []
+  try {
+    return rowsToObjects(d, 'SELECT tag FROM topic_tags ORDER BY tag').map(
+      (r) => String(r.tag),
+    )
+  } catch {
+    return [] // table absent in old DB — migration will create it on next Python run
+  }
+}
+
+export async function listCourses(): Promise<string[]> {
+  const d = await ensure()
+  if (!d) return []
+  try {
+    return rowsToObjects(d, 'SELECT name FROM courses ORDER BY name').map(
+      (r) => String(r.name),
+    )
+  } catch {
+    return []
+  }
+}
+
 // Integrity + orphan check for the DB Health Check (§5.7).
 export async function dbHealth(): Promise<{
   ok: boolean
@@ -755,6 +799,9 @@ export async function dbHealth(): Promise<{
 // confirm in the UI. sql.js works on an in-memory snapshot, so the modified DB
 // must be exported back to disk; then drop the snapshot so reads re-read it.
 export async function clearConceptCache(): Promise<{ cleared: number }> {
+  // Reload first so the snapshot reflects any rows written by recent pipeline runs;
+  // without this, exporting the stale snapshot back to disk would destroy them.
+  reload()
   const d = await ensure()
   if (!d) return { cleared: 0 }
   const before = scalar(d, 'SELECT COUNT(*) FROM concept_maps')

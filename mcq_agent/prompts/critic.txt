@@ -26,7 +26,10 @@ Step 3 — Criterion-by-criterion check:
 
 a) **Source grounding**: Is the marked correct answer explicitly supported by the source? Quote the supporting passage. If you cannot find supporting text, mark this FAIL.
 
-b) **Uniqueness of correct answer** (for single_correct): Is exactly one option unambiguously correct? Could a knowledgeable person reasonably argue for another option? If yes, mark FAIL.
+b) **Uniqueness / ordering correctness**:
+   - For single_correct: Is exactly one option unambiguously correct? Could a knowledgeable person reasonably argue for another option? If yes, mark FAIL.
+   - For ordering: All options must have is_correct=false. The correct_order field must list a sequence that can be verified from the source. If the sequence is ambiguous or not derivable from the source, mark FAIL.
+   - For multiple_correct: At least one but not all options are correct. Each correct option must be independently verifiable from the source.
 
 c) **Distractor plausibility**: Are the wrong options plausible to someone with partial knowledge? Or are any of them absurd, off-topic, or obviously wrong? If any distractor is implausible, mark FAIL.
 

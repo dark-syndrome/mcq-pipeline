@@ -318,6 +318,7 @@ def generate_mcqs(
     concept_slice: list | None = None,
     temperature_override: float | None = None,
     bloom_target: BloomLevel | None = None,
+    subtopics: list[str] | None = None,
 ) -> tuple[list[MCQ], TokenUsage]:
     """
     Stage 2: generate candidate MCQs.
@@ -330,6 +331,9 @@ def generate_mcqs(
     used by the per-Bloom-level generation loop to apply each level's configured
     temperature. bloom_target, when set, pins the batch to a single cognitive
     level (injected as a prompt directive and used to filter few-shot examples).
+
+    subtopics, when provided, injects a directive asking the LLM to assign each
+    question's sub_topic field to the most appropriate value from the list.
     """
     from .config import load_dotenv_and_get_api_key
 
@@ -418,6 +422,16 @@ def generate_mcqs(
     else:
         mixed_types_hint = ""
 
+    if subtopics:
+        subtopic_directive = (
+            "- Sub-topic assignment: set each question's sub_topic field to the single\n"
+            "  most appropriate value from this list (use the exact string, no paraphrasing):\n"
+            f"  {', '.join(subtopics)}\n"
+            f"  If the question does not fit any subtopic well, use: {subtopics[0]}"
+        )
+    else:
+        subtopic_directive = ""
+
     prompt = (
         template
         .replace("{source_content}", t2_text)
@@ -431,6 +445,7 @@ def generate_mcqs(
         .replace("{num_questions_to_generate}", str(num_to_generate))
         .replace("{mixed_types_hint}", mixed_types_hint)
         .replace("{bloom_directive}", _bloom_directive(bloom_target))
+        .replace("{subtopic_directive}", subtopic_directive)
     )
 
     effective_temp = (

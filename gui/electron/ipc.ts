@@ -10,6 +10,7 @@ import { lintFile } from './lint'
 import {
   buildDocx,
   buildJson,
+  buildPaperXlsx,
   buildPdf,
   buildXlsx,
   writeFileSync,
@@ -23,6 +24,11 @@ import {
   startSupabasePush,
   type RunParams,
 } from './sidecar'
+import {
+  getPaperFilterOptions,
+  queryPaperMcqs,
+  type PaperQueryParams,
+} from './paperQuery'
 
 // Single place that wires the renderer's window.api (see preload.ts) to the
 // main-process implementations.
@@ -52,6 +58,8 @@ export function registerIpc(): void {
   )
   ipcMain.handle('outputs:analyzerCacheHitRate', () => outputs.analyzerCacheHitRate())
   ipcMain.handle('outputs:sourceLinterStats', () => outputs.sourceLinterStats())
+  ipcMain.handle('db:topicTags', () => db.listTopicTags())
+  ipcMain.handle('db:courses', () => db.listCourses())
   ipcMain.handle('db:filterOptions', () => db.filterOptions())
   ipcMain.handle('db:queryMcqs', (_e, filter?: db.McqFilter) =>
     db.queryMcqs(filter ?? {}),
@@ -67,19 +75,23 @@ export function registerIpc(): void {
 
   ipcMain.handle('dialog:openMarkdown', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    const result = await dialog.showOpenDialog(win ?? undefined!, {
+    const opts: Electron.OpenDialogOptions = {
       properties: ['openFile'],
       filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
-    })
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, opts)
+      : await dialog.showOpenDialog(opts)
     return result.canceled ? null : result.filePaths[0]
   })
 
   // Save a copy of a generated output file to a user-chosen location.
   ipcMain.handle('file:saveCopy', async (e, srcPath: string) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    const result = await dialog.showSaveDialog(win ?? undefined!, {
-      defaultPath: path.basename(srcPath),
-    })
+    const saveOpts = { defaultPath: path.basename(srcPath) }
+    const result = win
+      ? await dialog.showSaveDialog(win, saveOpts)
+      : await dialog.showSaveDialog(saveOpts)
     if (result.canceled || !result.filePath) return null
     await fs.promises.copyFile(srcPath, result.filePath)
     return result.filePath
@@ -90,6 +102,8 @@ export function registerIpc(): void {
   ipcMain.handle('run:start', (e, params: RunParams) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) throw new Error('No window for this run request.')
+    // Kill the subprocess if the window closes mid-run so it doesn't consume API quota.
+    win.once('closed', () => { if (isRunning()) cancelRun() })
     startRun(win, params)
   })
   ipcMain.handle('run:cancel', () => cancelRun())
@@ -106,17 +120,24 @@ export function registerIpc(): void {
     ext: string,
   ): Promise<string | null> => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    const result = await dialog.showSaveDialog(win ?? undefined!, {
+    const exportOpts = {
       defaultPath: `${defaultName}.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
-    })
+    }
+    const result = win
+      ? await dialog.showSaveDialog(win, exportOpts)
+      : await dialog.showSaveDialog(exportOpts)
     if (result.canceled || !result.filePath) return null
     if (opts.format === 'json') {
       writeFileSync(result.filePath, buildJson(rows, opts))
     } else if (opts.format === 'docx') {
       writeFileSync(result.filePath, await buildDocx(rows, opts))
     } else if (opts.format === 'xlsx') {
-      writeFileSync(result.filePath, buildXlsx(rows, opts))
+      // Paper XLSX uses a fixed column layout; regular XLSX uses the metadata-rich layout.
+      writeFileSync(
+        result.filePath,
+        opts.paperHeader ? buildPaperXlsx(rows) : buildXlsx(rows, opts),
+      )
     } else {
       writeFileSync(result.filePath, await buildPdf(rows, opts))
     }
@@ -145,10 +166,13 @@ export function registerIpc(): void {
     'evalset:export',
     async (e, set: evalset.EvalSet, defaultName: string) => {
       const win = BrowserWindow.fromWebContents(e.sender)
-      const result = await dialog.showSaveDialog(win ?? undefined!, {
+      const evalExportOpts = {
         defaultPath: `${defaultName}.json`,
         filters: [{ name: 'JSON Eval Set', extensions: ['json'] }],
-      })
+      }
+      const result = win
+        ? await dialog.showSaveDialog(win, evalExportOpts)
+        : await dialog.showSaveDialog(evalExportOpts)
       if (result.canceled || !result.filePath) return null
       fs.writeFileSync(result.filePath, JSON.stringify(set, null, 2), 'utf-8')
       return result.filePath
@@ -157,10 +181,13 @@ export function registerIpc(): void {
 
   ipcMain.handle('evalset:import', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    const result = await dialog.showOpenDialog(win ?? undefined!, {
+    const evalImportOpts: Electron.OpenDialogOptions = {
       properties: ['openFile'],
       filters: [{ name: 'JSON Eval Set', extensions: ['json'] }],
-    })
+    }
+    const result = win
+      ? await dialog.showOpenDialog(win, evalImportOpts)
+      : await dialog.showOpenDialog(evalImportOpts)
     if (result.canceled || !result.filePaths[0]) return null
     try {
       return JSON.parse(fs.readFileSync(result.filePaths[0], 'utf-8'))
@@ -168,6 +195,12 @@ export function registerIpc(): void {
       return null
     }
   })
+
+  // --- Question Paper Builder (§5.8) ---
+  ipcMain.handle('paper:filterOptions', () => getPaperFilterOptions())
+  ipcMain.handle('paper:queryMcqs', (_e, params: PaperQueryParams) =>
+    queryPaperMcqs(params),
+  )
 
   // --- Supabase push (§5.7) via the Python dedup gate ---
   ipcMain.handle(

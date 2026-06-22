@@ -1,5 +1,11 @@
-# Secrets
+# Secrets — never commit API keys or environment files
 .env
+.env.*
+!.env.example
+
+# Node (root-level headroom-ai / MCP dependencies)
+node_modules/
+package-lock.json
 
 # Python
 __pycache__/
@@ -20,6 +26,15 @@ mcq_env/
 logs/*.db
 output/*.json
 output/*.csv
+output/**/*.json
+output/**/*.csv
+output/**/*.pdf
+output/**/*.docx
+output/**/*.xlsx
+
+# Generated exam papers in docs/
+docs/MCQ_Examination_*
+docs/~$*
 
 # IDE
 .vscode/
@@ -33,9 +48,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
-
-# Generated data files in project root
-questions.json
 
 # Claude Code local configuration
 .claude/

@@ -80,7 +80,7 @@ class MCQConfig(BaseModel):
     topic_filter: list[str] | None = None
     over_generation_factor: float = Field(default=1.5, ge=1.0, le=3.0)
     max_regeneration_attempts: int = Field(default=1, ge=0, le=3)
-    model: str = "claude-sonnet-4-6"
+    model: str = "google/gemini-2.5-flash"
     temperature: float = Field(default=0.7, ge=0.0, le=1.0)
 
 
@@ -260,10 +260,13 @@ class MCQ(BaseModel):
     bloom_level: BloomLevel
     difficulty: Difficulty
     question_type: QuestionType
-    stem_pattern: StemPattern
-    correct_order: list[str] | None = None
+    stem_pattern: StemPattern = StemPattern.DEFINITION  # default for old DB rows missing this field
+    correct_order: list[str] | None = None  # deprecated; kept for backward compat only
+    ordering_statements: list[str] | None = None  # numbered steps for ORDERING questions
     question_number: int | None = None
     generation_number: int | None = None
+    sub_topic: str | None = None  # module-level tag; kept for GUI/DB backward compat
+    tags: list[str] = []          # full tag list: [MODULE, DIFFICULTY, IS_PUBLIC, COURSE_TAG]
 
     @field_validator("bloom_level", mode="before")
     @classmethod
@@ -305,15 +308,21 @@ class MCQ(BaseModel):
         opts = self.options
 
         if qt == QuestionType.ORDERING:
-            if any(opt.is_correct for opt in opts):
+            if not self.ordering_statements:
                 raise ValueError(
-                    "ORDERING questions must have is_correct=False on all options."
+                    "ORDERING questions require ordering_statements (the numbered steps list)."
                 )
-            if not self.correct_order:
-                raise ValueError("correct_order is required for ORDERING questions.")
-            labels = {opt.label for opt in opts}
-            if set(self.correct_order) != labels:
-                raise ValueError("correct_order labels must match option labels exactly.")
+            correct_count = sum(1 for o in opts if o.is_correct)
+            if correct_count != 1:
+                raise ValueError(
+                    f"ORDERING questions must have exactly 1 correct option "
+                    f"(the correct sequence), found {correct_count}."
+                )
+            if self.correct_order is not None:
+                raise ValueError(
+                    "correct_order must be null in the new ORDERING format; "
+                    "mark the correct sequence option with is_correct: true instead."
+                )
         else:
             if not any(opt.is_correct for opt in opts):
                 raise ValueError("At least one option must be marked as correct.")
@@ -374,3 +383,5 @@ class PipelineRun(BaseModel):
     salvaged_count: int = 0
     generation_number: int = 0
     topic: str | None = None  # lesson topic label set at CLI time; used for Supabase navigation
+    run_name: str | None = None  # human-readable name for the run, set at CLI time
+    subtopics: list[str] = []   # ordered list of subtopic tags used for this run

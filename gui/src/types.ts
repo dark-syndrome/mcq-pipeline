@@ -12,7 +12,7 @@ export type BloomLevel =
   | 'analyze'
   | 'evaluate'
   | 'create'
-export type QuestionType = 'single_correct' | 'ordering' | 'code_snippet'
+export type QuestionType = 'single_correct' | 'multiple_correct' | 'ordering'
 
 export type StageId =
   | 'parse'
@@ -265,6 +265,9 @@ export interface McqRow {
   bloom_level: string
   difficulty: string
   question_type: string
+  sub_topic: string | null
+  tags?: string[]
+  ordering_statements?: string[]
 }
 export interface DifficultyRatio {
   easy: number
@@ -301,6 +304,17 @@ export interface QueryResult {
 
 // --- Files export (§5.6) ---
 export type ExportFormat = 'json' | 'docx' | 'pdf' | 'xlsx'
+
+export interface PaperHeader {
+  institution?: string
+  title: string
+  subject?: string
+  date?: string
+  duration?: string
+  maxMarks?: number
+  instructions?: string
+}
+
 export interface ExportOptions {
   format: ExportFormat
   includeExplanation?: boolean
@@ -310,6 +324,43 @@ export interface ExportOptions {
   metadata?: boolean
   coverPage?: boolean
   topic?: string
+  paperHeader?: PaperHeader
+}
+
+// --- Question Paper Builder (§5.8) ---
+export interface PaperFilterOptions {
+  generations: { generation_number: number; label: string }[]
+  topics: string[]
+  subTopics: string[]
+  source: 'supabase' | 'sqlite'
+}
+
+export interface SubTopicAlloc {
+  subTopic: string
+  easyCount: number
+  mediumCount: number
+  hardCount: number
+}
+
+export interface PaperQueryParams {
+  easyCount: number
+  mediumCount: number
+  hardCount: number
+  generationNumbers?: number[]
+  topics?: string[]
+  subTopicAllocs?: SubTopicAlloc[]
+}
+
+export interface PaperBucket {
+  difficulty: string
+  requested: number
+  got: number
+}
+
+export interface PaperQueryResult {
+  rows: McqRow[]
+  buckets: PaperBucket[]
+  source: 'supabase' | 'sqlite'
 }
 
 // --- DB management panel (§5.7) ---

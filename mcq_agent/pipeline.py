@@ -41,6 +41,7 @@ from .config import Settings
 from .llm_client import LLMClient, TokenUsage, _NULL_USAGE
 from .parser import ParsedDocument, parse_markdown
 from .schemas import CritiqueResult, MCQ, MCQConfig, PipelineRun
+from .sub_topic_matcher import assign_tags, resolve_module_override
 from .source_linter import run_concept_density_check, run_static_linter
 from .reframer import reframe_rejected
 from .validators import run_all_validators
@@ -461,6 +462,9 @@ def run_pipeline(
     llm_client: LLMClient,
     output_dir: Path | None = None,
     topic: str | None = None,
+    topic_tag: str | None = None,
+    run_name: str | None = None,
+    subtopics: list[str] | None = None,
 ) -> PipelineRun:
     run_id = str(uuid.uuid4())
     started_at = datetime.now(tz=timezone.utc)
@@ -624,12 +628,27 @@ def run_pipeline(
                 if bloom_target is not None else None
             )
 
-            candidates, gen_usage = generator_mod.generate_mcqs(
-                document, concept_map, level_config, settings, llm_client,
-                concept_slice=concept_slice,
-                temperature_override=lvl_temp,
-                bloom_target=bloom_target,
-            )
+            try:
+                candidates, gen_usage = generator_mod.generate_mcqs(
+                    document, concept_map, level_config, settings, llm_client,
+                    concept_slice=concept_slice,
+                    temperature_override=lvl_temp,
+                    bloom_target=bloom_target,
+                    subtopics=subtopics or [],
+                )
+            except Exception as gen_exc:
+                # instructor exhausted its retries (e.g. model produced a
+                # structurally invalid question — wrong correct_order for an
+                # ORDERING question). Log, skip this batch, let the outer
+                # while-loop retry with a fresh generation call.
+                log.warning(
+                    "pipeline_generate_batch_failed",
+                    attempt=attempt + 1,
+                    bloom_level=bloom_target.value if bloom_target else "flat",
+                    error=str(gen_exc)[:400],
+                )
+                continue
+
             gen_usages.append(gen_usage)
             batch_count = len(candidates)
             total_generated += batch_count
@@ -815,6 +834,24 @@ def run_pipeline(
     )
 
     # ------------------------------------------------------------------
+    # Assign topic tag + full tag list to every accepted question
+    # ------------------------------------------------------------------
+    effective_topic_tag = topic_tag or settings.topic_tag or "UNTAGGED"
+    assign_tags(
+        final_mcqs,
+        topic_tag=effective_topic_tag,
+        is_public=settings.is_public,
+        course_tag=settings.course_tag,
+        subtopics=subtopics or [],
+    )
+    log.info(
+        "pipeline_tags_assigned",
+        topic_tag=effective_topic_tag,
+        course_tag=settings.course_tag,
+        count=len(final_mcqs),
+    )
+
+    # ------------------------------------------------------------------
     # Assign globally-sequential question and generation numbers
     # run_number is already computed at the top of this function.
     # get_total_accepted_count reads the DB *before* this run is logged,
@@ -859,6 +896,8 @@ def run_pipeline(
         salvaged_count=salvaged_count,
         generation_number=run_number,
         topic=topic,
+        run_name=run_name,
+        subtopics=subtopics or [],
     )
 
     config_path = _write_run_config(

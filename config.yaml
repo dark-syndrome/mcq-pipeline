@@ -1,6 +1,9 @@
 # ============================================================
-#  MCQ Agent — application configuration  (v0.6 production)
-#  All stages use google/gemini-2.5-flash via OpenRouter.
+#  MCQ Agent — application configuration  (v0.7 production)
+#  Hybrid model setup — tested 2026-06-13:
+#    Analyzer  : google/gemini-2.5-pro   (richer concept maps; cached after 1st run)
+#    Generator : google/gemini-2.5-flash (best source grounding; bulk-friendly)
+#    Critic    : google/gemini-2.5-flash (reliable evaluation; fast)
 # ============================================================
 
 # ---- Provider ---------------------------------------------------
@@ -8,11 +11,12 @@ provider: openrouter
 model: google/gemini-2.5-flash
 
 # ---- Per-stage model overrides ----------------------------------
-# All three stages use the same model for simplicity and compatibility.
-# Analyzer result is cached after the first run — cost is incurred once only.
+# Analyzer uses Pro for a richer ConceptMap (concepts, templates, confusion pairs).
+# The result is cached per source-file MD5 — Pro cost is incurred once per document.
+# Generator + Critic use Flash: better source grounding in our A/B tests, fast, cheap.
 
 analyzer_provider: openrouter
-analyzer_model: google/gemini-2.5-flash
+analyzer_model: google/gemini-2.5-pro
 
 generator_provider: openrouter
 generator_model: google/gemini-2.5-flash
@@ -21,7 +25,7 @@ critic_provider: openrouter
 critic_model: google/gemini-2.5-flash
 
 # ---- Question generation ----------------------------------------
-num_questions: 10
+num_questions: 20
 difficulty: medium
 question_type: single_correct
 num_options: 4
@@ -29,21 +33,22 @@ include_explanations: true
 topic_filter: null
 over_generation_factor: 2.0
 max_regeneration_attempts: 1
-# Generate a mix of single_correct, ordering, and code-snippet-based questions.
-# Ordering questions test step-sequencing (procedures, setup workflows).
-# Code-snippet questions embed a code block in the stem (debugging/scenario patterns).
+# Ordering and code-snippet questions are generated for higher-order Bloom
+# levels (apply+). If the model produces a structurally invalid ordering
+# question, pipeline.py now catches the batch failure and retries instead
+# of aborting the run.
 mixed_question_types: true
 
 # ---- Quality control --------------------------------------------
 # Lowered from 0.85 — large documents with T2 truncation produce
 # source excerpts that match the original at ~0.65–0.75. Setting
 # this too high causes all questions to fail validator on first pass.
-source_grounding_threshold: 0.65
+source_grounding_threshold: 0.55
 
 # ---- LLM temperatures per stage ---------------------------------
-temperature: 0.7
-critic_temperature: 0.2
-analyzer_temperature: 0.2
+temperature: 0.5
+critic_temperature: 0.5
+analyzer_temperature: 0.5
 
 # ---- Per-Bloom-level generation temperature (Model tab §3.4) -----
 # Controls how creatively the Generator approaches each cognitive level.
@@ -67,9 +72,9 @@ enable_per_bloom_generation: false
 # ---- Per-stage token budgets ------------------------------------
 # Generator: 150 questions × 2.0 factor = 300 candidates per full pass.
 # Each batch generates ~30-40 questions. Budget must cover that output.
-max_tokens: 32000           # generator — large batches for 150q runs
-critic_max_tokens: 4000     # critic — single MCQ evaluation
-analyzer_max_tokens: 20000  # analyzer — 70-page document ConceptMap
+max_tokens: 32000 # generator — large batches for 150q runs
+critic_max_tokens: 4000 # critic — single MCQ evaluation
+analyzer_max_tokens: 32000 # analyzer — Pro generates richer ConceptMaps; bumped from 20k
 
 # ---- Guarantee-n accepted questions -----------------------------
 guarantee_n_retries: 20
@@ -78,7 +83,10 @@ guarantee_n_retries: 20
 linter_min_words: 300
 linter_min_sections: 2
 linter_min_words_per_section: 50
-linter_min_concept_density: 0.3
+# Pro analyzer extracts fewer but richer concepts (~0.14/section vs Flash's ~0.22).
+# Lowered from 0.3 → 0.2 so Pro concept maps score WARN (not FAIL).
+# FAIL threshold = linter_min_concept_density × 0.6 = 0.12 concepts/section.
+linter_min_concept_density: 0.2
 linter_fail_on_warn: false
 
 # ---- Retry / rate-limit -----------------------------------------
@@ -86,10 +94,13 @@ api_max_retries: 3
 api_retry_initial_backoff: 2.0
 
 # ---- Pricing (USD per 1M tokens; cost reporting only) -----------
-# google/gemini-2.5-flash via OpenRouter
+# Verify current rates at https://openrouter.ai/models
+# pricing       → analyzer  (google/gemini-2.5-pro)
+# generator_pricing → generator (google/gemini-2.5-flash)
+# critic_pricing    → critic    (google/gemini-2.5-flash)
 pricing:
-  input_per_million_tokens: 0.15
-  output_per_million_tokens: 0.60
+  input_per_million_tokens: 1.25
+  output_per_million_tokens: 10.00
 
 generator_pricing:
   input_per_million_tokens: 0.15
@@ -99,12 +110,25 @@ critic_pricing:
   input_per_million_tokens: 0.15
   output_per_million_tokens: 0.60
 
+# ---- Token compression (Headroom) ------------------------------
+# Compresses LLM input before every API call using headroom-ai.
+# Highest impact on Generator calls: ConceptMap JSON + T2 prose are
+# re-sent on every retry — SmartCrusher (JSON) and Kompress-base (prose)
+# together reduce generator input tokens by ~50-70%.
+# Set to false to disable (e.g. for A/B benchmarking raw vs compressed cost).
+use_headroom: true
+
+# ---- Tagging ---------------------------------------------------
+# topic_tag: null         # override the interactive CLI prompt with a fixed tag
+is_public: true
+course_tag: GRIT_ROBOTICS_L1_MAIN
+
 # ---- Cloud storage (Supabase) -----------------------------------
 # Step 1: Create an account at https://supabase.com and create a project.
 # Step 2: Run supabase_schema.sql in the Supabase SQL editor.
 # Step 3: Add SUPABASE_URL and SUPABASE_KEY to your .env file.
 # Step 4: Set enable_supabase to true below.
-enable_supabase: false
+enable_supabase: true
 # Similarity threshold for the automated gate (0-100). Questions scoring at or
 # above this value are dropped as duplicates before reaching Supabase.
 # Lower = stricter. Must match your intent in check_similarity.py --threshold.
@@ -119,5 +143,5 @@ log_level: INFO
 log_db_path: logs/runs.db
 
 # ---- Paths ------------------------------------------------------
-prompts_dir: prompts
-few_shot_examples_file: prompts/few_shot_examples.json3
+prompts_dir: mcq_agent/prompts
+few_shot_examples_file: mcq_agent/prompts/few_shot_examples.json

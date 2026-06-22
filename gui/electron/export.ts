@@ -14,6 +14,16 @@ import * as XLSX from 'xlsx'
 // generation lives here; the save-dialog interaction stays in ipc.ts. Rows are
 // the parsed McqRow objects sent from the renderer (see src/types.ts).
 
+export interface PaperHeader {
+  institution?: string
+  title: string
+  subject?: string
+  date?: string
+  duration?: string
+  maxMarks?: number
+  instructions?: string
+}
+
 export interface ExportOptions {
   format: 'json' | 'docx' | 'pdf' | 'xlsx'
   // JSON
@@ -25,6 +35,8 @@ export interface ExportOptions {
   metadata?: boolean
   coverPage?: boolean
   topic?: string
+  // Question paper header (replaces coverPage when present)
+  paperHeader?: PaperHeader
 }
 
 interface Opt {
@@ -85,10 +97,30 @@ export function buildJson(rows: ExportRow[], o: ExportOptions): string {
 // --- shared styled HTML (used by the PDF path) ---
 export function buildHtml(rows: ExportRow[], o: ExportOptions): string {
   const title = o.topic || 'MCQ Export'
-  const cover = o.coverPage
-    ? `<section class="cover"><h1>${esc(title)}</h1>
+
+  // Paper header takes priority over the generic cover page.
+  let cover = ''
+  if (o.paperHeader) {
+    const h = o.paperHeader
+    const metaParts: string[] = []
+    if (h.subject) metaParts.push(`Subject: ${esc(h.subject)}`)
+    if (h.date) metaParts.push(`Date: ${esc(h.date)}`)
+    if (h.duration) metaParts.push(`Duration: ${esc(h.duration)}`)
+    if (h.maxMarks != null) metaParts.push(`Max Marks: ${h.maxMarks}`)
+    cover =
+      `<div class="paper-header">` +
+      (h.institution ? `<p class="ph-institution">${esc(h.institution)}</p>` : '') +
+      `<h1 class="ph-title">${esc(h.title)}</h1>` +
+      (metaParts.length ? `<p class="ph-meta">${metaParts.join(' &nbsp;|&nbsp; ')}</p>` : '') +
+      `<hr class="ph-rule">` +
+      (h.instructions
+        ? `<p class="ph-instructions"><b>Instructions:</b> ${esc(h.instructions)}</p>`
+        : '') +
+      `</div>`
+  } else if (o.coverPage) {
+    cover = `<section class="cover"><h1>${esc(title)}</h1>
          <p>${rows.length} questions</p></section>`
-    : ''
+  }
   const questions = rows
     .map((r, i) => {
       const opts = r.options
@@ -129,6 +161,12 @@ export function buildHtml(rows: ExportRow[], o: ExportOptions): string {
     body{font-family:Segoe UI,Arial,sans-serif;color:#111;margin:32px;font-size:13px;line-height:1.45}
     .cover{text-align:center;margin:120px 0;page-break-after:always}
     .cover h1{font-size:28px}
+    .paper-header{text-align:center;margin-bottom:20px;padding-bottom:12px}
+    .ph-institution{font-size:13px;font-weight:600;margin:0 0 4px}
+    .ph-title{font-size:22px;font-weight:700;margin:0 0 6px}
+    .ph-meta{font-size:12px;margin:0 0 8px;color:#333}
+    .ph-rule{border:none;border-top:2px solid #111;margin:6px 0 8px}
+    .ph-instructions{font-size:12px;text-align:left;margin:0}
     .q{margin:0 0 18px;page-break-inside:avoid}
     .stem{margin:0 0 6px}
     ul{margin:4px 0;padding-left:22px;list-style:none}
@@ -173,7 +211,66 @@ export async function buildDocx(
 ): Promise<Buffer> {
   const children: Paragraph[] = []
 
-  if (o.coverPage) {
+  if (o.paperHeader) {
+    const h = o.paperHeader
+    if (h.institution) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: h.institution, bold: true, size: 26 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 60 },
+        }),
+      )
+    }
+    children.push(
+      new Paragraph({
+        text: h.title,
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+      }),
+    )
+    const metaParts: string[] = []
+    if (h.subject) metaParts.push(`Subject: ${h.subject}`)
+    if (h.date) metaParts.push(`Date: ${h.date}`)
+    if (h.duration) metaParts.push(`Duration: ${h.duration}`)
+    if (h.maxMarks != null) metaParts.push(`Max Marks: ${h.maxMarks}`)
+    if (metaParts.length) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: metaParts.join('    '), size: 22 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 60, after: 80 },
+        }),
+      )
+    }
+    // Horizontal rule via an underline-styled empty paragraph
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: '─'.repeat(80),
+            color: '111111',
+            size: 16,
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
+      }),
+    )
+    if (h.instructions) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Instructions: ', bold: true }),
+            new TextRun({ text: h.instructions }),
+          ],
+          spacing: { before: 40, after: 240 },
+        }),
+      )
+    } else {
+      children.push(new Paragraph({ text: '', spacing: { after: 120 } }))
+    }
+  } else if (o.coverPage) {
     children.push(
       new Paragraph({
         text: o.topic || 'MCQ Export',
@@ -279,7 +376,7 @@ export function buildXlsx(rows: ExportRow[], o: ExportOptions): Buffer {
   const aoa: (string | number | null)[][] = [headers]
   rows.forEach((r, i) => {
     const sorted = [...r.options].sort((a, b) =>
-      (a.label ?? '').localeCompare(b.label ?? ''),
+      (a.label ?? '').localeCompare(b.label ?? '', 'en'),
     )
     const answer = sorted.find((op) => op.is_correct)?.label ?? ''
     const row: (string | number | null)[] = [
@@ -338,6 +435,75 @@ export function buildXlsx(rows: ExportRow[], o: ExportOptions): Buffer {
   ]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'MCQs')
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+}
+
+// --- Paper XLSX (question-paper export format) ---
+// Fixed column layout used when exporting a generated question paper.
+// Columns: S.No | question content | Option A-D | Explanation | Key |
+// Portal upload format: S.No | question content | A-D | Explanation | Key | sub_topic | Difficulty | IS_PUBLIC/IS_PRIVATE
+export function buildPaperXlsx(rows: ExportRow[]): Buffer {
+  const headers = [
+    'S. No',
+    'question content',
+    'Option A',
+    'Option B',
+    'Option C',
+    'Option D',
+    'Explanation',
+    'Key',
+    'SUB TOPIC',
+    'Difficulty',
+    'IS_PUBLIC/IS_PRIVATE',
+  ]
+
+  const aoa: (string | number | null)[][] = [headers]
+  rows.forEach((r, i) => {
+    const sorted = [...r.options].sort((a, b) =>
+      (a.label ?? '').localeCompare(b.label ?? '', 'en'),
+    )
+    const correctOpt = sorted.find((op) => op.is_correct)
+    if (!correctOpt) {
+      console.warn(`[export] Row ${i + 1} has no correct option — skipping`)
+      return
+    }
+    const key = correctOpt.label
+    const tagList = Array.isArray(r['tags']) ? (r['tags'] as string[]) : []
+    const visibility = tagList.includes('IS_PUBLIC') ? 'IS_PUBLIC' : 'IS_PRIVATE'
+    aoa.push([
+      i + 1,
+      r.question,
+      sorted[0]?.text ?? '',
+      sorted[1]?.text ?? '',
+      sorted[2]?.text ?? '',
+      sorted[3]?.text ?? '',
+      r.explanation ?? '',
+      key,
+      String(r['sub_topic'] ?? ''),
+      r.difficulty
+        ? r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1)
+        : '',
+      visibility,
+    ])
+  })
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+  ws['!cols'] = [
+    { wch: 6 },  // S. No
+    { wch: 70 }, // question content
+    { wch: 36 }, // Option A
+    { wch: 36 }, // Option B
+    { wch: 36 }, // Option C
+    { wch: 36 }, // Option D
+    { wch: 60 }, // Explanation
+    { wch: 8 },  // Key
+    { wch: 30 }, // SUB TOPIC
+    { wch: 12 }, // Difficulty
+    { wch: 20 }, // IS_PUBLIC/IS_PRIVATE
+  ]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Questions')
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
 }
 

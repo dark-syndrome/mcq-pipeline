@@ -68,7 +68,10 @@ CREATE TABLE IF NOT EXISTS runs (
     total_input_tokens    INTEGER NOT NULL,
     total_output_tokens   INTEGER NOT NULL,
     cost_usd              REAL NOT NULL,
-    generation_number     INTEGER NOT NULL DEFAULT 0
+    generation_number     INTEGER NOT NULL DEFAULT 0,
+    run_name              TEXT,
+    topic_tag             TEXT,
+    course_tag            TEXT
 );
 """
 
@@ -85,8 +88,6 @@ CREATE TABLE IF NOT EXISTS mcqs (
 """
 
 # Concept map cache — keyed by MD5 of the source file content.
-# INSERT OR REPLACE means re-running on the same file updates the cache if
-# the analyzer was re-run (e.g. after a model change).
 _CREATE_CONCEPT_MAPS = """
 CREATE TABLE IF NOT EXISTS concept_maps (
     file_hash         TEXT PRIMARY KEY,
@@ -96,6 +97,32 @@ CREATE TABLE IF NOT EXISTS concept_maps (
     concept_map_json  TEXT NOT NULL
 );
 """
+
+_CREATE_TOPIC_TAGS = """
+CREATE TABLE IF NOT EXISTS topic_tags (
+    tag        TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+);
+"""
+
+_CREATE_COURSES = """
+CREATE TABLE IF NOT EXISTS courses (
+    name       TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+);
+"""
+
+# Default topic tags seeded on first init
+_DEFAULT_TOPIC_TAGS = [
+    "LINUX_ROS2_FUNDAMENTALS",
+    "ROBOT_MODELLING",
+    "ROBOT_MATHEMATICS",
+    "SIMULATION",
+    "SLAM",
+    "NAVIGATION",
+    "COMPUTER_VISION",
+    "EMBEDDED_SYSTEMS",
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -112,17 +139,34 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add any new columns / tables that didn't exist in earlier DB versions."""
+    from datetime import datetime, timezone
+    now = datetime.now(tz=timezone.utc).isoformat()
+
     conn.execute(_CREATE_CONCEPT_MAPS)
-    # Add generation_number to runs if missing (introduced for cloud sync)
-    try:
-        conn.execute("ALTER TABLE runs ADD COLUMN generation_number INTEGER NOT NULL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass  # column already exists
-    # Add question_number to mcqs if missing
-    try:
-        conn.execute("ALTER TABLE mcqs ADD COLUMN question_number INTEGER")
-    except sqlite3.OperationalError:
-        pass  # column already exists
+    conn.execute(_CREATE_TOPIC_TAGS)
+    conn.execute(_CREATE_COURSES)
+
+    for col_sql in [
+        "ALTER TABLE runs ADD COLUMN generation_number INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE runs ADD COLUMN run_name TEXT",
+        "ALTER TABLE runs ADD COLUMN topic_tag TEXT",
+        "ALTER TABLE runs ADD COLUMN course_tag TEXT",
+        "ALTER TABLE mcqs ADD COLUMN question_number INTEGER",
+        "ALTER TABLE runs ADD COLUMN subtopics_json TEXT",
+    ]:
+        try:
+            conn.execute(col_sql)
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
+    # Seed default topic tags if table is empty
+    count = conn.execute("SELECT COUNT(*) FROM topic_tags").fetchone()[0]
+    if count == 0:
+        conn.executemany(
+            "INSERT OR IGNORE INTO topic_tags (tag, created_at) VALUES (?, ?)",
+            [(tag, now) for tag in _DEFAULT_TOPIC_TAGS],
+        )
+
     conn.commit()
 
 
@@ -267,30 +311,38 @@ def get_total_accepted_count(db_path: Path) -> int:
 
 
 def log_run(run: PipelineRun, db_path: Path) -> None:
-    """
-    Persist *run* to the database.
-
-    Inserts one row into ``runs`` and one row per MCQ into ``mcqs``.
-
-    Args:
-        run:     The completed pipeline run to store.
-        db_path: Path to the SQLite database.
-    """
+    """Persist *run* to the database."""
     init_db(db_path)
 
     half = run.total_tokens_used // 2
     total_input  = half
     total_output = run.total_tokens_used - half
 
+    # Derive topic_tag / course_tag from the first accepted MCQ's 4-element tag list:
+    # [SUB_TOPIC, BLOOM_LEVEL, IS_PUBLIC?, COURSE_TAG]
+    # The course tag is always the last element; the topic tag is always first.
+    # We require at least 2 elements so we don't mistake the topic for the course.
+    topic_tag: str | None = None
+    course_tag: str | None = None
+    if run.final_mcqs:
+        tags = run.final_mcqs[0].tags or []
+        if len(tags) >= 1:
+            topic_tag = tags[0]
+        # Course tag is the last element only when the list has 3+ elements
+        # (i.e. at least topic + bloom + course; IS_PUBLIC may or may not be present).
+        if len(tags) >= 3:
+            course_tag = tags[-1]
+
     with _connect(db_path) as conn:
+        subtopics_json = json.dumps(run.subtopics) if run.subtopics else None
         conn.execute(
             """
             INSERT OR REPLACE INTO runs
                 (run_id, timestamp, input_file, config_json,
                  generated_count, passed_count,
                  total_input_tokens, total_output_tokens, cost_usd,
-                 generation_number)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 generation_number, run_name, topic_tag, course_tag, subtopics_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run.run_id,
@@ -303,6 +355,10 @@ def log_run(run: PipelineRun, db_path: Path) -> None:
                 total_output,
                 run.total_cost_usd,
                 run.generation_number,
+                getattr(run, "run_name", None),
+                topic_tag,
+                course_tag,
+                subtopics_json,
             ),
         )
 
@@ -361,6 +417,15 @@ def get_run(run_id: str, db_path: Path) -> PipelineRun | None:
         code_examples=[], technical_facts=[],
     )
 
+    keys = row.keys()
+    subtopics_raw = row["subtopics_json"] if "subtopics_json" in keys else None
+    subtopics: list[str] = []
+    if subtopics_raw:
+        try:
+            subtopics = json.loads(subtopics_raw)
+        except (json.JSONDecodeError, TypeError):
+            subtopics = []
+
     from datetime import datetime
     return PipelineRun(
         run_id=row["run_id"],
@@ -374,7 +439,9 @@ def get_run(run_id: str, db_path: Path) -> PipelineRun | None:
         rejected_mcqs=rejected_mcqs,
         total_tokens_used=row["total_input_tokens"] + row["total_output_tokens"],
         total_cost_usd=row["cost_usd"],
-        generation_number=row["generation_number"] if "generation_number" in row.keys() else 0,
+        generation_number=row["generation_number"] if "generation_number" in keys else 0,
+        run_name=row["run_name"] if "run_name" in keys else None,
+        subtopics=subtopics,
     )
 
 
@@ -389,7 +456,7 @@ def list_recent_runs(db_path: Path, limit: int = 10) -> list[dict[str, Any]]:
             SELECT run_id, timestamp, input_file,
                    generated_count, passed_count,
                    total_input_tokens + total_output_tokens AS total_tokens,
-                   cost_usd
+                   cost_usd, run_name, topic_tag, course_tag
             FROM runs
             ORDER BY timestamp DESC
             LIMIT ?
@@ -398,3 +465,123 @@ def list_recent_runs(db_path: Path, limit: int = 10) -> list[dict[str, Any]]:
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def get_all_run_summaries(db_path: Path) -> list[dict[str, Any]]:
+    """Return all runs ordered by generation_number for the retag command."""
+    if not db_path.exists():
+        return []
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT run_id, generation_number, timestamp, input_file,
+                   passed_count, run_name, topic_tag, course_tag
+            FROM runs
+            ORDER BY generation_number ASC
+            """,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Public API — topic tags & courses
+# ---------------------------------------------------------------------------
+
+
+def list_topic_tags(db_path: Path) -> list[str]:
+    """Return all stored topic tag names, ordered alphabetically."""
+    if not db_path.exists():
+        return list(_DEFAULT_TOPIC_TAGS)
+    with _connect(db_path) as conn:
+        rows = conn.execute("SELECT tag FROM topic_tags ORDER BY tag").fetchall()
+    return [r["tag"] for r in rows]
+
+
+def add_topic_tag(tag: str, db_path: Path) -> None:
+    """Add a new topic tag (no-op if it already exists)."""
+    from datetime import datetime, timezone
+    init_db(db_path)
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO topic_tags (tag, created_at) VALUES (?, ?)",
+            (tag, datetime.now(tz=timezone.utc).isoformat()),
+        )
+        conn.commit()
+
+
+def list_courses(db_path: Path) -> list[str]:
+    """Return all stored course names, ordered alphabetically."""
+    if not db_path.exists():
+        return []
+    with _connect(db_path) as conn:
+        rows = conn.execute("SELECT name FROM courses ORDER BY name").fetchall()
+    return [r["name"] for r in rows]
+
+
+def add_course(name: str, db_path: Path) -> None:
+    """Add a new course name (no-op if it already exists)."""
+    from datetime import datetime, timezone
+    init_db(db_path)
+    with _connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO courses (name, created_at) VALUES (?, ?)",
+            (name, datetime.now(tz=timezone.utc).isoformat()),
+        )
+        conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Public API — backfill / retag
+# ---------------------------------------------------------------------------
+
+
+def retag_run(
+    run_id: str,
+    topic_tag: str,
+    course_tag: str,
+    db_path: Path,
+    is_public: bool = True,
+    run_name: str | None = None,
+) -> int:
+    """
+    Rewrite tags on every accepted MCQ in *run_id* using the new 4-element
+    format [topic_tag, bloom_level, IS_PUBLIC, course_tag].
+
+    Returns the number of MCQ rows updated.
+    """
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, mcq_json FROM mcqs WHERE run_id = ? AND passed = 1",
+            (run_id,),
+        ).fetchall()
+
+        updated = 0
+        for row in rows:
+            mcq = MCQ.model_validate_json(row["mcq_json"])
+            bloom = mcq.bloom_level.value.upper()
+            tag_list: list[str] = [topic_tag, bloom]
+            if is_public:
+                tag_list.append("IS_PUBLIC")
+            tag_list.append(course_tag)
+            mcq.sub_topic = topic_tag
+            mcq.tags = tag_list
+            conn.execute(
+                "UPDATE mcqs SET mcq_json = ? WHERE id = ?",
+                (mcq.model_dump_json(), row["id"]),
+            )
+            updated += 1
+
+        # Update the run record too
+        update_cols = ["topic_tag = ?", "course_tag = ?"]
+        params: list[Any] = [topic_tag, course_tag]
+        if run_name is not None:
+            update_cols.append("run_name = ?")
+            params.append(run_name)
+        params.append(run_id)
+        conn.execute(
+            f"UPDATE runs SET {', '.join(update_cols)} WHERE run_id = ?",
+            params,
+        )
+        conn.commit()
+
+    return updated

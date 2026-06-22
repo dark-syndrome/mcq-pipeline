@@ -143,6 +143,20 @@ class Settings(BaseSettings):
     # The primary question_type in MCQConfig becomes the majority type (~60%).
     mixed_question_types: bool = False
 
+    # -- Token compression (Headroom) -----------------------------------------
+    # Compresses LLM input tokens before every API call.  Highest impact on
+    # Generator calls (ConceptMap JSON + T2 prose, re-sent every retry).
+    # Gracefully degrades to no-op if headroom-ai is not installed.
+    use_headroom: bool = True
+
+    # -- Tagging --------------------------------------------------------------
+    # Topic tag applied to every question in a run.  When None the CLI will
+    # prompt interactively (or fallback to "UNTAGGED" in non-interactive mode).
+    topic_tag: str | None = None
+    # Fixed tags added to every question's tag list.
+    is_public: bool = True
+    course_tag: str = "GRIT_ROBOTICS_L1_MAIN"
+
     # -- Cloud storage (Supabase) ---------------------------------------------
     # Set to true after configuring SUPABASE_URL and SUPABASE_KEY in .env
     enable_supabase: bool = False
@@ -159,8 +173,8 @@ class Settings(BaseSettings):
     log_db_path: str = "logs/runs.db"
 
     # -- Paths ----------------------------------------------------------------
-    prompts_dir: str = "prompts"
-    few_shot_examples_file: str = "prompts/few_shot_examples.json"
+    prompts_dir: str = "mcq_agent/prompts"
+    few_shot_examples_file: str = "mcq_agent/prompts/few_shot_examples.json"
 
     # -----------------------------------------------------------------------
     # Stage resolution helpers

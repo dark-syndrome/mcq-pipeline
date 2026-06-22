@@ -18,6 +18,10 @@ import type {
   LintReport,
   McqFilter,
   McqRow,
+  PaperBucket,
+  PaperFilterOptions,
+  PaperQueryParams,
+  PaperQueryResult,
   PipelineEvent,
   ProcessExitEvent,
   QueryResult,
@@ -38,6 +42,11 @@ export interface RunStartParams {
   difficulty?: string
   type?: string
   topic?: string
+  topicTag?: string
+  runName?: string
+  subtopics?: string[]
+  course?: string
+  isPublic?: boolean
   outputDir?: string
 }
 
@@ -62,6 +71,8 @@ export interface Api {
     tokenUsageByStage: (limit?: number) => Promise<TokenUsageByStage>
     analyzerCacheHitRate: () => Promise<CacheHitRate>
     sourceLinterStats: () => Promise<SourceLinterStats>
+    topicTags: () => Promise<string[]>
+    courses: () => Promise<string[]>
     filterOptions: () => Promise<FilterOptions>
     queryMcqs: (filter?: McqFilter) => Promise<QueryResult>
     status: () => Promise<DbStatus>
@@ -74,6 +85,10 @@ export interface Api {
       opts: ExportOptions,
       defaultName: string,
     ) => Promise<string | null>
+  }
+  paper: {
+    filterOptions: () => Promise<PaperFilterOptions>
+    queryMcqs: (params: PaperQueryParams) => Promise<PaperQueryResult>
   }
   supabase: {
     push: (opts: { runId?: string; dryRun?: boolean }) => Promise<void>

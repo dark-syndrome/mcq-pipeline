@@ -16,10 +16,13 @@ function loadDotEnv(): void {
   for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
+    // Split only on the FIRST '=' so base64/JWT values (which contain '=') are preserved.
     const eq = t.indexOf('=')
     if (eq < 0) continue
     const key = t.slice(0, eq).trim()
-    const val = t.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+    const raw = t.slice(eq + 1).trim()
+    // Strip a single pair of surrounding quotes if present.
+    const val = /^(["']).*\1$/.test(raw) ? raw.slice(1, -1) : raw
     if (key && !process.env[key]) process.env[key] = val
   }
 }
@@ -35,7 +38,15 @@ function supabaseAvailable(): boolean {
 export interface PaperFilterOptions {
   generations: { generation_number: number; label: string }[]
   topics: string[]
+  subTopics: string[]
   source: 'supabase' | 'sqlite'
+}
+
+export interface SubTopicAlloc {
+  subTopic: string
+  easyCount: number
+  mediumCount: number
+  hardCount: number
 }
 
 export interface PaperQueryParams {
@@ -44,6 +55,7 @@ export interface PaperQueryParams {
   hardCount: number
   generationNumbers?: number[]
   topics?: string[]
+  subTopicAllocs?: SubTopicAlloc[]
 }
 
 export interface PaperBucket {
@@ -69,6 +81,8 @@ export interface PaperRow {
   bloom_level: string
   difficulty: string
   question_type: string
+  sub_topic: string | null
+  tags: string[]
 }
 
 export interface PaperQueryResult {
@@ -90,7 +104,7 @@ async function sbClient() {
 async function sbFilterOptions(): Promise<PaperFilterOptions> {
   const sb = await sbClient()
 
-  const [{ data: genData }, { data: topicData }] = await Promise.all([
+  const [{ data: genData }, { data: topicData }, { data: stData }] = await Promise.all([
     sb.from('runs')
       .select('generation_number, generation_label')
       .order('generation_number', { ascending: false }),
@@ -98,6 +112,11 @@ async function sbFilterOptions(): Promise<PaperFilterOptions> {
       .select('source_lesson')
       .not('source_lesson', 'is', null)
       .order('source_lesson'),
+    sb.from('mcqs')
+      .select('mcq_json')
+      .eq('passed', 1)
+      .not('mcq_json', 'is', null)
+      .limit(2000),
   ])
 
   const gensSeen = new Set<number>()
@@ -123,7 +142,21 @@ async function sbFilterOptions(): Promise<PaperFilterOptions> {
     }
   }
 
-  return { generations, topics, source: 'supabase' }
+  const subTopicsSeen = new Set<string>()
+  const subTopics: string[] = []
+  for (const r of stData ?? []) {
+    try {
+      const m = typeof r.mcq_json === 'string' ? JSON.parse(r.mcq_json) : (r.mcq_json ?? {})
+      const st = (m as Record<string, unknown>).sub_topic as string | undefined
+      if (st && !subTopicsSeen.has(st)) {
+        subTopicsSeen.add(st)
+        subTopics.push(st)
+      }
+    } catch { /* ignore */ }
+  }
+  subTopics.sort()
+
+  return { generations, topics, subTopics, source: 'supabase' }
 }
 
 async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult> {
@@ -153,11 +186,37 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
     }
   }
 
-  // Fetch a pool of candidates per difficulty bucket, then random-sample client-side
-  // (PostgREST has no RANDOM() ORDER BY — we over-fetch and shuffle locally).
   const POOL = 200
 
-  async function fetchBucket(diffs: string[], need: number): Promise<PaperRow[]> {
+  function parsePaperRow(row: Record<string, unknown>): PaperRow {
+    const m = (row.mcq_json ?? {}) as Record<string, unknown>
+    return {
+      id: typeof row.id === 'number' ? row.id : 0,
+      run_id: String(row.run_id ?? ''),
+      question_number: row.question_number as number | null,
+      passed: true,
+      generation_number: 0,
+      input_file: '',
+      source_file: '',
+      timestamp: '',
+      question: String(m.question ?? ''),
+      options: Array.isArray(m.options) ? (m.options as PaperRow['options']) : [],
+      explanation: (m.explanation as string) ?? null,
+      source_excerpt: (m.source_excerpt as string) ?? null,
+      source_heading: String(m.source_heading ?? ''),
+      bloom_level: String(m.bloom_level ?? ''),
+      difficulty: String(m.difficulty ?? row.difficulty ?? ''),
+      question_type: String(m.question_type ?? ''),
+      sub_topic: (m.sub_topic as string) ?? null,
+      tags: Array.isArray(m.tags) ? (m.tags as string[]) : [],
+    }
+  }
+
+  async function fetchBucket(
+    diffs: string[],
+    need: number,
+    subTopic?: string,
+  ): Promise<PaperRow[]> {
     if (need <= 0) return []
     let q = sb
       .from('mcqs')
@@ -168,28 +227,57 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
     if (runIds) q = q.in('run_id', runIds)
     const { data } = await q
     if (!data?.length) return []
-    const pool = [...data].sort(() => Math.random() - 0.5)
-    return pool.slice(0, need).map((row) => {
-      const m = (row.mcq_json ?? {}) as Record<string, unknown>
-      return {
-        id: typeof row.id === 'number' ? row.id : 0,
-        run_id: String(row.run_id ?? ''),
-        question_number: row.question_number as number | null,
-        passed: true,
-        generation_number: 0,
-        input_file: '',
-        source_file: '',
-        timestamp: '',
-        question: String(m.question ?? ''),
-        options: Array.isArray(m.options) ? (m.options as PaperRow['options']) : [],
-        explanation: (m.explanation as string) ?? null,
-        source_excerpt: (m.source_excerpt as string) ?? null,
-        source_heading: String(m.source_heading ?? ''),
-        bloom_level: String(m.bloom_level ?? ''),
-        difficulty: String(m.difficulty ?? row.difficulty ?? ''),
-        question_type: String(m.question_type ?? ''),
-      }
-    })
+    let pool = [...data].sort(() => Math.random() - 0.5)
+    // Filter by sub_topic client-side (no PostgREST json path filter available on all setups)
+    if (subTopic) {
+      pool = pool.filter((row) => {
+        try {
+          const m = typeof row.mcq_json === 'string'
+            ? JSON.parse(row.mcq_json as string)
+            : (row.mcq_json ?? {})
+          return (m as Record<string, unknown>).sub_topic === subTopic
+        } catch { return false }
+      })
+    }
+    return pool.slice(0, need).map(parsePaperRow)
+  }
+
+  // Sub-topic allocation mode: fetch per-sub-topic-per-difficulty bucket.
+  if (params.subTopicAllocs?.length) {
+    const allRows: PaperRow[] = []
+    const buckets: PaperBucket[] = []
+    const easyCounts: Record<string, number> = {}
+    const medCounts: Record<string, number> = {}
+    const hardCounts: Record<string, number> = {}
+
+    await Promise.all(
+      params.subTopicAllocs.map(async (alloc) => {
+        const [eR, mR, hR] = await Promise.all([
+          fetchBucket(['easy'], alloc.easyCount, alloc.subTopic),
+          fetchBucket(['medium'], alloc.mediumCount, alloc.subTopic),
+          fetchBucket(['hard', 'expert'], alloc.hardCount, alloc.subTopic),
+        ])
+        allRows.push(...eR, ...mR, ...hR)
+        easyCounts[alloc.subTopic] = eR.length
+        medCounts[alloc.subTopic] = mR.length
+        hardCounts[alloc.subTopic] = hR.length
+      }),
+    )
+
+    const totalE = Object.values(easyCounts).reduce((a, b) => a + b, 0)
+    const totalM = Object.values(medCounts).reduce((a, b) => a + b, 0)
+    const totalH = Object.values(hardCounts).reduce((a, b) => a + b, 0)
+    buckets.push(
+      { difficulty: 'easy', requested: params.easyCount, got: totalE },
+      { difficulty: 'medium', requested: params.mediumCount, got: totalM },
+      { difficulty: 'hard/expert', requested: params.hardCount, got: totalH },
+    )
+
+    return {
+      rows: allRows.sort(() => Math.random() - 0.5),
+      buckets,
+      source: 'supabase',
+    }
   }
 
   const [easyRows, mediumRows, hardRows] = await Promise.all([
@@ -218,7 +306,10 @@ function basename(p: string): string {
 }
 
 async function sqliteFilterOptions(): Promise<PaperFilterOptions> {
-  const opts = await db.filterOptions()
+  const [opts, subTopics] = await Promise.all([
+    db.filterOptions(),
+    db.distinctSubTopics(),
+  ])
   return {
     generations: opts.runs.map((r) => ({
       generation_number: r.generation_number,
@@ -227,6 +318,7 @@ async function sqliteFilterOptions(): Promise<PaperFilterOptions> {
     topics: [
       ...new Set(opts.sourceFiles.map((f) => f.label.replace(/\.[^.]+$/, ''))),
     ],
+    subTopics,
     source: 'sqlite',
   }
 }
@@ -248,25 +340,6 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
           .map((f) => f.path)
       : undefined
 
-  async function fetchBucket(difficulties: string[], need: number) {
-    if (need <= 0) return { rows: [] as Record<string, unknown>[], got: 0 }
-    const r = await db.queryMcqs({
-      passedOnly: true,
-      difficulties,
-      runIds,
-      sourceFiles,
-      fetchMode: 'random',
-      limit: need,
-    })
-    return { rows: r.rows, got: r.rows.length }
-  }
-
-  const [easy, medium, hard] = await Promise.all([
-    fetchBucket(['easy'], params.easyCount),
-    fetchBucket(['medium'], params.mediumCount),
-    fetchBucket(['hard', 'expert'], params.hardCount),
-  ])
-
   function toPaperRow(r: Record<string, unknown>, fallbackId: number): PaperRow {
     return {
       id: typeof r.id === 'number' ? r.id : fallbackId,
@@ -285,8 +358,68 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
       bloom_level: String(r.bloom_level ?? ''),
       difficulty: String(r.difficulty ?? ''),
       question_type: String(r.question_type ?? ''),
+      sub_topic: (r.sub_topic as string) ?? null,
+      tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
     }
   }
+
+  async function fetchBucket(difficulties: string[], need: number, subTopics?: string[]) {
+    if (need <= 0) return { rows: [] as Record<string, unknown>[], got: 0 }
+    const r = await db.queryMcqs({
+      passedOnly: true,
+      difficulties,
+      runIds,
+      sourceFiles,
+      subTopics,
+      fetchMode: 'random',
+      limit: need,
+    })
+    return { rows: r.rows, got: r.rows.length }
+  }
+
+  // Sub-topic allocation mode: fetch per-sub-topic-per-difficulty.
+  if (params.subTopicAllocs?.length) {
+    let idx = 0
+    const allRows: PaperRow[] = []
+    let totalEReq = 0, totalMReq = 0, totalHReq = 0
+    let totalEGot = 0, totalMGot = 0, totalHGot = 0
+
+    for (const alloc of params.subTopicAllocs) {
+      totalEReq += alloc.easyCount
+      totalMReq += alloc.mediumCount
+      totalHReq += alloc.hardCount
+
+      const [easy, medium, hard] = await Promise.all([
+        fetchBucket(['easy'], alloc.easyCount, [alloc.subTopic]),
+        fetchBucket(['medium'], alloc.mediumCount, [alloc.subTopic]),
+        fetchBucket(['hard', 'expert'], alloc.hardCount, [alloc.subTopic]),
+      ])
+      totalEGot += easy.got
+      totalMGot += medium.got
+      totalHGot += hard.got
+      allRows.push(
+        ...easy.rows.map((r) => toPaperRow(r, idx++)),
+        ...medium.rows.map((r) => toPaperRow(r, idx++)),
+        ...hard.rows.map((r) => toPaperRow(r, idx++)),
+      )
+    }
+
+    return {
+      rows: allRows.sort(() => Math.random() - 0.5),
+      buckets: [
+        { difficulty: 'easy', requested: totalEReq, got: totalEGot },
+        { difficulty: 'medium', requested: totalMReq, got: totalMGot },
+        { difficulty: 'hard/expert', requested: totalHReq, got: totalHGot },
+      ],
+      source: 'sqlite',
+    }
+  }
+
+  const [easy, medium, hard] = await Promise.all([
+    fetchBucket(['easy'], params.easyCount),
+    fetchBucket(['medium'], params.mediumCount),
+    fetchBucket(['hard', 'expert'], params.hardCount),
+  ])
 
   let idx = 0
   const allRows = [

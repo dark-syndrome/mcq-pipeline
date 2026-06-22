@@ -1,1321 +1,1375 @@
 [
   {
-    "_comment": "EASY-1 | remember | single_correct | definition | GPIO voltage",
-    "question": "Which of the following is the standard voltage level for GPIO pins on the ESP32-S3?",
+    "_comment": "Q1 — Bloom: Analyze. Debugging ros2 topic echo producing no output.",
+    "stem_pattern": "debugging",
+    "question": "A developer runs the following command in a terminal:\n\n```bash\nros2 topic echo /cmd_vel\n```\n\nThe terminal shows no output and no error, and the robot is not moving. Which of the following is the most accurate interpretation of this observation?",
     "options": [
       {
         "label": "A",
-        "text": "1.8 V",
+        "text": "The /cmd_vel topic does not exist in the ROS 2 graph.",
         "is_correct": false,
-        "distractor_rationale": "Some low-power MCUs use 1.8 V logic; students new to ESP32 may confuse it with other chips."
+        "distractor_rationale": "A non-existent topic causes ros2 topic echo to print an explicit 'topic not found' error, not silent waiting."
       },
       {
         "label": "B",
-        "text": "3.3 V",
+        "text": "No node is currently publishing messages to /cmd_vel.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "5 V",
+        "text": "The topic exists, but is using an incompatible message type.",
         "is_correct": false,
-        "distractor_rationale": "Arduino Uno uses 5 V logic \u2014 a very common source of confusion when moving platforms."
+        "distractor_rationale": "A type mismatch causes a deserialization error, not silent waiting with no output."
       },
       {
         "label": "D",
-        "text": "12 V",
+        "text": "The ros2 topic echo command requires sudo privileges to subscribe.",
         "is_correct": false,
-        "distractor_rationale": "12 V is typical for motor drivers and external supplies, not logic-level GPIO."
+        "distractor_rationale": "ROS 2 CLI tools do not require elevated privileges for topic subscription."
       }
     ],
-    "explanation": "ESP32-S3 GPIO pins operate at 3.3 V. Applying 5 V directly will damage the chip.",
-    "source_excerpt": "The ESP32-S3 GPIO pins operate at 3.3 V; do not apply 5 V signals directly.",
-    "source_heading": "ESP32-S3 Hardware > GPIO Specifications",
-    "bloom_level": "remember",
-    "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "explanation": "When a topic exists but has no active publisher, ros2 topic echo connects silently and waits — it prints nothing and does not error. A non-existent topic produces an explicit error. A type mismatch causes an error, not silence.",
+    "source_excerpt": "ros2 topic echo connects to a topic and blocks waiting for messages. If no publisher is active, the command waits silently.",
+    "source_heading": "ROS 2 Fundamentals > CLI Tools > ros2 topic",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
   },
   {
-    "_comment": "EASY-2 | remember | single_correct | definition | MQTT broker role",
-    "question": "In an MQTT network, what is the role of the broker?",
+    "_comment": "Q2 — Bloom: Analyze. Package not found after successful build.",
+    "stem_pattern": "debugging",
+    "question": "A developer creates a ROS 2 package with a publisher node. After building with colcon and sourcing the workspace, they run:\n\n```bash\nros2 run my_robot_pkg talker\n```\n\nThey receive the following error:\n\n```\nPackage 'my_robot_pkg' not found\n```\n\nThe developer confirms the package folder exists inside the src/ directory and the build completed without errors. What is the most likely cause?",
     "options": [
       {
         "label": "A",
-        "text": "It stores sensor data in a relational database for later retrieval.",
+        "text": "The package name in package.xml does not match the folder name.",
         "is_correct": false,
-        "distractor_rationale": "Students often confuse a message broker with a time-series database used alongside it."
+        "distractor_rationale": "A name mismatch would typically cause the build itself to fail, not a post-build runtime error."
       },
       {
         "label": "B",
-        "text": "It receives messages from publishers and forwards them to matching subscribers.",
+        "text": "The developer forgot to source the workspace overlay with source install/setup.bash.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "It directly polls each device on the network and collects readings.",
+        "text": "colcon build was run from inside the src/ directory instead of the workspace root.",
         "is_correct": false,
-        "distractor_rationale": "Describes a request-response polling model, which is the opposite of pub-sub."
+        "distractor_rationale": "Running colcon from inside src/ causes build errors, not a silent success followed by a missing-package error."
       },
       {
         "label": "D",
-        "text": "It assigns IP addresses to IoT devices on the local network.",
+        "text": "The node entry point is missing from the setup.py console_scripts section.",
         "is_correct": false,
-        "distractor_rationale": "Describes a DHCP server, not a message broker."
+        "distractor_rationale": "A missing entry point would produce 'No executable found' rather than 'Package not found'."
       }
     ],
-    "explanation": "The broker is the central relay in MQTT. Publishers send messages tagged with topics; the broker routes copies to all clients subscribed to those topics.",
-    "source_excerpt": "The broker receives all published messages and forwards them to clients that have subscribed to the matching topic.",
-    "source_heading": "Communication Protocols > MQTT > Architecture",
-    "bloom_level": "remember",
-    "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "explanation": "The ament package index is written to install/ during the build, but ros2 run only sees it after the overlay is sourced. The build succeeded, so a wrong build directory (C) is eliminated. Only sourcing resolves the 'Package not found' error.",
+    "source_excerpt": "After colcon build, you must source install/setup.bash to register the new packages with the ROS 2 package index.",
+    "source_heading": "ROS 2 Fundamentals > Workspace > Sourcing the Overlay",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
   },
   {
-    "_comment": "EASY-3 | understand | single_correct | definition | pub-sub decoupling",
-    "question": "What does the 'publish-subscribe' model in MQTT mean?",
+    "_comment": "Q3 — Bloom: Apply. Correct sequence to create package with custom service. Arrange-in-order wrapped as MCQ.",
+    "stem_pattern": "procedure",
+    "question": "A student wants to create a ROS 2 Python package that defines a custom service, implement a server node for it, and verify the service is live. The following 5 steps are required but are listed out of order:\n\n1. Define the .srv file and declare it in CMakeLists.txt, then build the package\n2. Source the workspace and call the service using ros2 service call\n3. Create the ROS 2 package with ros2 pkg create, specifying build type and dependencies\n4. Write the service server node in Python, importing the generated service type\n5. Register the node as an entry point in setup.py and rebuild\n\nWhich sequence is correct?",
     "options": [
       {
         "label": "A",
-        "text": "Devices send messages directly to one another after subscribing to a peer list.",
-        "is_correct": false,
-        "distractor_rationale": "Confuses pub-sub with peer-to-peer; students miss the broker's decoupling role."
+        "text": "3 → 1 → 4 → 5 → 2",
+        "is_correct": true,
+        "distractor_rationale": null
       },
       {
         "label": "B",
-        "text": "Devices publish messages to topics on a broker, and other devices subscribe to those topics to receive them.",
+        "text": "1 → 3 → 5 → 4 → 2",
+        "is_correct": false,
+        "distractor_rationale": "Attempting to define the .srv file before the package exists has no target directory to write into."
+      },
+      {
+        "label": "C",
+        "text": "3 → 4 → 1 → 5 → 2",
+        "is_correct": false,
+        "distractor_rationale": "Writing the server node (4) before building the .srv file (1) means the generated service type Python module does not yet exist and cannot be imported."
+      },
+      {
+        "label": "D",
+        "text": "1 → 4 → 3 → 5 → 2",
+        "is_correct": false,
+        "distractor_rationale": "Starts with .srv definition and node writing before any package exists — both steps have no workspace context."
+      }
+    ],
+    "explanation": "Create the package first (3), define and build the custom service type so Python can import it (1), write the server node that uses the generated type (4), register and rebuild so ros2 run can find the node (5), then verify by calling the service (2).",
+    "source_excerpt": "Custom service types must be compiled before any Python node can import them. The package must exist before either the .srv file or the server node can be created.",
+    "source_heading": "ROS 2 Services > Custom Service Types",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "ordering",
+    "ordering_statements": [
+      "Create the ROS 2 package with ros2 pkg create, specifying build type and dependencies",
+      "Define the .srv file and declare it in CMakeLists.txt, then build the package",
+      "Write the service server node in Python, importing the generated service type",
+      "Register the node as an entry point in setup.py and rebuild",
+      "Source the workspace and call the service using ros2 service call"
+    ]
+  },
+  {
+    "_comment": "Q4 — Bloom: Analyze. Launch file output='log' hides terminal output.",
+    "stem_pattern": "debugging",
+    "question": "A student writes the following ROS 2 launch file to bring up a robot node with parameters loaded from a YAML file:\n\n```python\nfrom launch import LaunchDescription\nfrom launch_ros.actions import Node\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='my_robot_pkg',\n            executable='controller_node',\n            name='controller',\n            parameters=['config/robot_params.yaml'],\n            remappings=[('/cmd_vel', '/robot/cmd_vel')],\n            output='log'\n        )\n    ])\n```\n\nThe node launches without error, but during debugging the developer cannot see any terminal output from the node's logger calls. Which line contains the error and what is its consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "parameters=['config/robot_params.yaml'] — relative paths are not resolved at runtime, so parameters silently fail to load and the node uses defaults.",
+        "is_correct": false,
+        "distractor_rationale": "Relative paths missing at runtime raise a FileNotFoundError — they do not silently fail."
+      },
+      {
+        "label": "B",
+        "text": "output='log' — all stdout and rclpy logger output is written to ~/.ros/log/ only, not shown in the terminal.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "A central server polls each device on a fixed schedule and publishes results.",
+        "text": "remappings=[('/cmd_vel', '/robot/cmd_vel')] — remappings require the tilde (~) prefix to work correctly with node namespaces.",
         "is_correct": false,
-        "distractor_rationale": "Describes polling \u2014 the pattern that pub-sub was designed to replace."
+        "distractor_rationale": "The tilde prefix is for private topic namespacing, not a requirement for remappings to function."
       },
       {
         "label": "D",
-        "text": "Devices subscribe to a paid messaging service and publish reports to it.",
+        "text": "executable='controller_node' — the executable name must match the Python filename exactly, including the .py extension.",
         "is_correct": false,
-        "distractor_rationale": "Takes 'publish' and 'subscribe' too literally in a commercial sense."
+        "distractor_rationale": "ROS 2 executables are registered by name in setup.py console_scripts; the .py extension is never used in the executable field."
       }
     ],
-    "explanation": "In MQTT pub-sub, publishers and subscribers never communicate directly. The broker decouples them by routing messages based on topic strings.",
-    "source_excerpt": "MQTT uses a publish-subscribe architecture: clients publish messages to topics on a broker, and other clients subscribe to topics to receive matching messages.",
-    "source_heading": "Communication Protocols > MQTT",
+    "explanation": "output='log' routes all node output including rclpy logging exclusively to the log file under ~/.ros/log/, suppressing terminal display entirely. The correct value for visible terminal output is output='screen'.",
+    "source_excerpt": "Setting output='log' in a launch Node action redirects all stdout and log output to the ROS 2 log file directory. Use output='screen' to display output in the terminal.",
+    "source_heading": "ROS 2 Launch > Node Action > output Parameter",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q5 — Bloom: Analyze. Missing collision element in URDF LiDAR link.",
+    "stem_pattern": "scenario",
+    "question": "A robot's URDF has a LiDAR link defined with a mesh for its visual geometry. A developer removes the <collision> element from that link entirely. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR disappears from RViz visualisation.",
+        "is_correct": false,
+        "distractor_rationale": "RViz renders the <visual> element; the <collision> element is irrelevant to RViz rendering."
+      },
+      {
+        "label": "B",
+        "text": "Gazebo ignores the link and does not spawn it.",
+        "is_correct": false,
+        "distractor_rationale": "Gazebo spawns all links defined in the URDF; a missing <collision> removes physics contact geometry but the link still exists."
+      },
+      {
+        "label": "C",
+        "text": "The robot spawns and moves correctly in Gazebo, but the LiDAR link passes through obstacles.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "URDF validation fails and the robot cannot be loaded.",
+        "is_correct": false,
+        "distractor_rationale": "A missing <collision> element is not a URDF schema error; the specification allows links without collision geometry."
+      }
+    ],
+    "explanation": "Gazebo uses the <collision> geometry for physics contact detection. Without it, the link has no collision boundary and passes through other objects. The <visual> element still renders correctly in both RViz and Gazebo.",
+    "source_excerpt": "The <collision> element in URDF defines the geometry Gazebo uses for contact physics. Without it, the link has no physical presence in simulation and passes through other bodies.",
+    "source_heading": "URDF > Link Elements > collision",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q6 — Bloom: Analyze. XACRO snippet swaps length/radius on cylinder.",
+    "stem_pattern": "debugging",
+    "question": "A student writes the following XACRO snippet to parameterise wheel geometry:\n\n```xml\n<xacro:property name=\"wheel_radius\" value=\"0.05\"/>\n<xacro:property name=\"wheel_width\"  value=\"0.02\"/>\n<link name=\"left_wheel\">\n  <visual>\n    <geometry>\n      <cylinder length=\"${wheel_radius}\" radius=\"${wheel_width}\"/>\n    </geometry>\n  </visual>\n</link>\n```\n\nThe robot loads without error but the wheels appear visually incorrect in RViz. Which line contains the error?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The xacro:property tags use value= instead of default= to set property values.",
+        "is_correct": false,
+        "distractor_rationale": "value= is the correct attribute for xacro:property; default= is used for xacro:arg, not xacro:property."
+      },
+      {
+        "label": "B",
+        "text": "The cylinder element swaps the length and radius attributes — wheel_radius is passed to length and wheel_width to radius.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The ${} substitution syntax is invalid inside geometry tags and must use xacro:arg instead.",
+        "is_correct": false,
+        "distractor_rationale": "${} substitution is valid anywhere inside an XACRO file, including inside geometry elements."
+      },
+      {
+        "label": "D",
+        "text": "The link is missing an <inertial> block, causing RViz to render geometry incorrectly.",
+        "is_correct": false,
+        "distractor_rationale": "A missing <inertial> block affects Gazebo physics simulation, not RViz visual rendering."
+      }
+    ],
+    "explanation": "A URDF cylinder uses length for the axle-axis dimension and radius for the rolling dimension. The snippet assigns wheel_radius (0.05) to length and wheel_width (0.02) to radius, producing a tall thin cylinder instead of a flat wheel.",
+    "source_excerpt": "URDF cylinder geometry uses 'length' for the axis-aligned dimension and 'radius' for the circular cross-section. Swapping these values produces the wrong visual shape.",
+    "source_heading": "URDF > Geometry > Cylinder",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q7 — Bloom: Remember. Linear velocity formula for differential drive robot.",
+    "stem_pattern": "definition",
+    "question": "A differential drive robot has wheel radius r and wheelbase L. The left wheel spins at angular velocity ωL and the right at ωR. What is the robot's linear velocity v?",
+    "options": [
+      {
+        "label": "A",
+        "text": "v = r(ωR − ωL) / 2",
+        "is_correct": false,
+        "distractor_rationale": "This computes the contribution to angular velocity, not linear velocity — the difference drives turning, not forward motion."
+      },
+      {
+        "label": "B",
+        "text": "v = r(ωR + ωL) / 2",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "v = (ωR + ωL) / 2L",
+        "is_correct": false,
+        "distractor_rationale": "Omits the wheel radius r and divides by wheelbase L — conflating the linear and angular velocity formulas."
+      },
+      {
+        "label": "D",
+        "text": "v = r·ωR − r·ωL",
+        "is_correct": false,
+        "distractor_rationale": "Computes the difference in wheel ground speeds, which contributes to angular velocity, not the robot's forward linear velocity."
+      }
+    ],
+    "explanation": "Each wheel's ground speed is r·ω. The robot's forward velocity is the mean of both wheel ground speeds: v = r(ωR + ωL)/2. Option A computes angular velocity ω.",
+    "source_excerpt": "For a differential drive robot, linear velocity v = r(ωR + ωL)/2 and angular velocity ω = r(ωR − ωL)/L.",
+    "source_heading": "Kinematics > Differential Drive > Velocity Equations",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q8 — Bloom: Analyze. Wheelbase miscalibration causes rotation undershoot.",
+    "stem_pattern": "scenario",
+    "question": "A robot's odometry computation uses a wheelbase L = 0.3 m, but the physical robot has L = 0.5 m. The robot executes a 90° in-place rotation command. What is the observed consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The robot translates sideways instead of rotating.",
+        "is_correct": false,
+        "distractor_rationale": "Wheelbase miscalibration affects angular computation, not the type of motion commanded."
+      },
+      {
+        "label": "B",
+        "text": "The robot rotates but overshoots, turning more than 90°.",
+        "is_correct": false,
+        "distractor_rationale": "With L underestimated, computed ω is inflated — the controller believes 90° is reached too early and stops before actual 90°, not after."
+      },
+      {
+        "label": "C",
+        "text": "The robot rotates but undershoots, turning less than 90°.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Linear velocity is affected, but angular velocity is unchanged.",
+        "is_correct": false,
+        "distractor_rationale": "Wheelbase L only appears in the angular velocity formula ω = r(ωR − ωL)/L; linear velocity is unaffected."
+      }
+    ],
+    "explanation": "Angular velocity ω = r(ωR − ωL)/L. With L underestimated (0.3 vs 0.5), the computed ω is larger than the true physical rotation rate. The controller believes the robot has reached 90° before it actually has and stops early — producing an undershoot.",
+    "source_excerpt": "If the wheelbase L used in odometry is smaller than the physical L, computed angular velocity will be inflated, causing the controller to stop rotation before the target angle is reached.",
+    "source_heading": "Kinematics > Differential Drive > Odometry Calibration",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q9 — Bloom: Analyze. Rotation drift caused by miscalibrated wheelbase.",
+    "stem_pattern": "debugging",
+    "question": "A robot's odometry drifts significantly after a 360° rotation, even though the encoders report the correct number of ticks. The developer checks: wheel radius is calibrated, tick-to-radian conversion is correct, and the update loop runs at a stable rate. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Encoder tick resolution is too low for the wheel circumference.",
+        "is_correct": false,
+        "distractor_rationale": "Low tick resolution causes both linear and angular drift; the problem here is isolated to rotation with correct encoder counts."
+      },
+      {
+        "label": "B",
+        "text": "The wheelbase L used in the angular velocity formula is miscalibrated.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "The odometry is integrated using the Euler method with too large a timestep.",
+        "is_correct": false,
+        "distractor_rationale": "Euler integration error causes general position drift accumulating over time, not an error specifically proportional to total rotation angle."
+      },
+      {
+        "label": "D",
+        "text": "The quaternion representing heading was not normalised after each update.",
+        "is_correct": false,
+        "distractor_rationale": "ROS 2 odometry typically uses yaw angle directly; quaternion normalisation errors are not the standard cause of rotation-specific drift."
+      }
+    ],
+    "explanation": "A full rotation with no net translation is a pure test of angular odometry, which depends entirely on L in ω = r(ωR − ωL)/L. A miscalibrated L accumulates angular error across the full 360°, producing a drift when returning to the start pose.",
+    "source_excerpt": "Rotation accuracy in differential drive odometry is governed primarily by wheelbase calibration. Even small errors in L accumulate proportionally with total rotation angle.",
+    "source_heading": "Kinematics > Differential Drive > Odometry Calibration",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q10 — Bloom: Analyze. Wheels slide in Gazebo due to missing inertial block.",
+    "stem_pattern": "debugging",
+    "question": "A URDF robot is spawned in Gazebo, but the wheels slide instead of rolling. Which missing element causes this?",
+    "options": [
+      {
+        "label": "A",
+        "text": "<visual> geometry on the wheel links.",
+        "is_correct": false,
+        "distractor_rationale": "<visual> affects rendering only; its absence does not affect Gazebo physics."
+      },
+      {
+        "label": "B",
+        "text": "<collision> geometry on the wheel links.",
+        "is_correct": false,
+        "distractor_rationale": "<collision> defines contact shape; without it the wheels would pass through the ground, not slide on it."
+      },
+      {
+        "label": "C",
+        "text": "<inertial> block with mass and inertia tensor on the wheel links.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "<gazebo> material tag on the wheel links.",
+        "is_correct": false,
+        "distractor_rationale": "The <gazebo> material tag affects visual colour/texture in Gazebo, not friction or contact physics."
+      }
+    ],
+    "explanation": "Without <inertial>, Gazebo treats the link as massless and cannot apply friction or torque — wheels slide freely. <visual> only affects rendering. <collision> defines contact shape but friction still requires inertia to act upon.",
+    "source_excerpt": "Gazebo requires an <inertial> block with a valid mass and inertia tensor on each dynamic link. Without it, the link is treated as static and massless, preventing friction from acting correctly.",
+    "source_heading": "URDF / Gazebo > Link Elements > inertial",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q11 — Bloom: Understand. Increasing LiDAR samples in Gazebo plugin.",
+    "stem_pattern": "scenario",
+    "question": "A Gazebo LiDAR plugin has samples set to 360. A developer increases it to 1440. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR range increases proportionally.",
+        "is_correct": false,
+        "distractor_rationale": "Range is a separate parameter; sample count controls angular density, not maximum detection distance."
+      },
+      {
+        "label": "B",
+        "text": "The /scan topic publishes at a higher frequency.",
+        "is_correct": false,
+        "distractor_rationale": "Publish frequency is controlled by update_rate in the plugin, not by the samples parameter."
+      },
+      {
+        "label": "C",
+        "text": "Angular resolution improves, but CPU load increases.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "D",
+        "text": "Gazebo throws a plugin error; samples must match the URDF ray count.",
+        "is_correct": false,
+        "distractor_rationale": "Gazebo imposes no hard constraint linking the samples parameter to URDF ray geometry definitions."
+      }
+    ],
+    "explanation": "More samples means finer angular resolution (4× denser rays) at the same scan rate, but each update is more expensive to compute, raising CPU load. Range is a separate parameter unaffected by sample count.",
+    "source_excerpt": "The 'samples' parameter in the Gazebo ray plugin determines the number of rays per scan sweep, directly controlling angular resolution and CPU cost per scan update.",
+    "source_heading": "Gazebo Plugins > LiDAR (Ray) Plugin > Parameters",
     "bloom_level": "understand",
     "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "question_type": "single_correct"
   },
   {
-    "_comment": "EASY-4 | remember | single_correct | definition | QoS 0 behaviour",
-    "question": "What delivery guarantee does MQTT QoS level 0 provide?",
+    "_comment": "Q12 — Bloom: Analyze. LiDAR scan floating above robot in RViz due to frame_id mismatch.",
+    "stem_pattern": "debugging",
+    "question": "A robot spawns in Gazebo and the /scan topic publishes data, but RViz shows the laser scan floating above the robot instead of at sensor height. What is the cause?",
     "options": [
       {
         "label": "A",
-        "text": "The message is delivered at least once, with possible duplicates.",
-        "is_correct": false,
-        "distractor_rationale": "Describes QoS 1, not QoS 0; students confuse the levels."
+        "text": "The LiDAR plugin's frame_id does not match the sensor link name in the URDF.",
+        "is_correct": true,
+        "distractor_rationale": null
       },
       {
         "label": "B",
-        "text": "The message is delivered exactly once with a two-step confirmation.",
+        "text": "The laser scan message is published with the wrong topic name.",
         "is_correct": false,
-        "distractor_rationale": "Describes QoS 2 \u2014 the most expensive delivery guarantee."
+        "distractor_rationale": "A wrong topic name would result in no scan being visible at all in RViz, not a mispositioned one."
       },
       {
         "label": "C",
-        "text": "The message is delivered at most once with no acknowledgement.",
+        "text": "RViz Fixed Frame is set to odom instead of base_link.",
+        "is_correct": false,
+        "distractor_rationale": "The Fixed Frame controls global reference but does not cause sensor-relative placement errors like floating at the wrong height."
+      },
+      {
+        "label": "D",
+        "text": "The update_rate in the plugin is too high for RViz to render correctly.",
+        "is_correct": false,
+        "distractor_rationale": "update_rate affects frequency and CPU load; it has no effect on the spatial placement of scan points."
+      }
+    ],
+    "explanation": "RViz positions the scan cloud using the frame_id in the LaserScan message header. If frame_id names a different frame than the URDF sensor link, TF cannot resolve the correct transform and the scan appears at the wrong position.",
+    "source_excerpt": "The LiDAR plugin's 'frameName' parameter must match the corresponding link name in the URDF so TF can correctly transform scan data into the robot frame.",
+    "source_heading": "Gazebo Plugins > LiDAR (Ray) Plugin > frame_id",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q13 — Bloom: Analyze. Increasing minimum_travel_distance in SLAM Toolbox reduces map update frequency.",
+    "stem_pattern": "scenario",
+    "question": "A developer increases minimum_travel_distance in SLAM Toolbox from 0.1 m to 0.5 m. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The map updates more frequently, increasing CPU load.",
+        "is_correct": false,
+        "distractor_rationale": "A larger threshold means fewer updates per metre — the opposite effect on both map freshness and CPU load."
+      },
+      {
+        "label": "B",
+        "text": "Loop closure checks are disabled entirely.",
+        "is_correct": false,
+        "distractor_rationale": "Loop closure is a separate pipeline in SLAM Toolbox; minimum_travel_distance controls scan insertion, not loop closure."
+      },
+      {
+        "label": "C",
+        "text": "The map updates less frequently, causing drift in corridors with few features.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "D",
-        "text": "The message is queued until the subscriber comes online and then delivered once.",
+        "text": "Scan matching fails because scans are too far apart to overlap.",
         "is_correct": false,
-        "distractor_rationale": "Describes persistent session behaviour, which is a separate feature from QoS level."
+        "distractor_rationale": "At 0.5 m intervals and typical LiDAR ranges of 10–30 m, scans still overlap substantially; scan matching continues to function."
       }
     ],
-    "explanation": "QoS 0 is 'fire and forget'. The broker sends the message once and does not track whether it arrived. It is the cheapest in bandwidth but offers no delivery guarantee.",
-    "source_excerpt": "QoS 0: at most once delivery \u2014 the message is sent once and not acknowledged.",
-    "source_heading": "Communication Protocols > MQTT > Quality of Service",
-    "bloom_level": "remember",
+    "explanation": "A larger threshold means fewer map updates per metre travelled. In a long featureless corridor, odometry drift accumulates between updates with no scan correction, degrading map quality. CPU load decreases, not increases.",
+    "source_excerpt": "SLAM Toolbox's minimum_travel_distance parameter sets the minimum robot displacement between consecutive map update attempts. Larger values reduce CPU load but allow more odometry drift between scan corrections.",
+    "source_heading": "SLAM Toolbox > Configuration Parameters > minimum_travel_distance",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q14 — Bloom: Analyze. Walls remain grey (unknown) on /map — LiDAR range too short.",
+    "stem_pattern": "debugging",
+    "question": "A robot runs SLAM Toolbox and the occupancy grid on /map appears correct in RViz, but walls show as grey (unknown) instead of black (occupied) after the robot passes them. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The LiDAR scan range is set lower than the distance to the walls.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "The /scan topic frame_id does not match the URDF sensor link.",
+        "is_correct": false,
+        "distractor_rationale": "A frame_id mismatch would spatially misplace the entire scan, not selectively fail to mark far walls."
+      },
+      {
+        "label": "C",
+        "text": "SLAM Toolbox is running in localization mode, not mapping mode.",
+        "is_correct": false,
+        "distractor_rationale": "Localization mode would prevent any new map cells from being written at all; the description says the nearby map is correct."
+      },
+      {
+        "label": "D",
+        "text": "The map resolution is too coarse to represent the wall thickness.",
+        "is_correct": false,
+        "distractor_rationale": "Coarse resolution would make walls blocky or single-cell thick, but they would still be marked occupied, not unknown."
+      }
+    ],
+    "explanation": "If the LiDAR's max range parameter is shorter than the actual wall distance, beams terminate before hitting the wall and no occupied cells are written — cells remain unknown. The nearby portions of the map are correct because those walls are within range.",
+    "source_excerpt": "SLAM Toolbox only marks cells as occupied when a LiDAR ray terminates at an obstacle. If the scan's maximum range is shorter than the obstacle distance, the ray ends in free space and the cell is never marked.",
+    "source_heading": "SLAM Toolbox > Sensor Configuration > range_max",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q15 — Bloom: Apply. Correct sequence to build, save, and reuse a SLAM map.",
+    "stem_pattern": "procedure",
+    "question": "A developer wants to build a map, save it, then reuse it for localization on the next run. The 5 steps are listed out of order:\n\n1. Launch SLAM Toolbox in localization mode with the saved .posegraph file\n2. Drive the robot through the environment until the map is complete\n3. Call the serialize_map service to save the map as a .posegraph file\n4. Launch SLAM Toolbox in mapping mode with slam_toolbox online_async\n5. Verify localization by checking that /map and /amcl_pose topics are publishing\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "4 → 2 → 1 → 3 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Inserts localization mode (1) before the map is serialized (3), so no .posegraph file yet exists to load."
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 3 → 1 → 5",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "2 → 4 → 3 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Starts driving before SLAM is running, so no map is being built."
+      },
+      {
+        "label": "D",
+        "text": "4 → 3 → 2 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Serializes the map immediately after launch before any exploration data has been collected, saving an empty map."
+      }
+    ],
+    "explanation": "Start SLAM in mapping mode (4), drive to build the map (2), serialize to disk (3), relaunch in localization mode with the saved file (1), then verify topics (5).",
+    "source_excerpt": "SLAM Toolbox's serialize_map service saves the current posegraph to disk. This file can later be loaded in localization-only mode to enable navigation without further mapping.",
+    "source_heading": "SLAM Toolbox > Map Serialization and Localization Mode",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "ordering",
+    "ordering_statements": [
+      "Launch SLAM Toolbox in mapping mode with slam_toolbox online_async",
+      "Drive the robot through the environment until the map is complete",
+      "Call the serialize_map service to save the map as a .posegraph file",
+      "Launch SLAM Toolbox in localization mode with the saved .posegraph file",
+      "Verify localization by checking that /map and /amcl_pose topics are publishing"
+    ]
+  },
+  {
+    "_comment": "Q16 — Bloom: Apply. Increasing inflation_radius to keep robot away from walls.",
+    "stem_pattern": "debugging",
+    "question": "A robot using Nav2 plans a path that hugs walls too closely, risking collisions. Which costmap parameter should the developer increase?",
+    "options": [
+      {
+        "label": "A",
+        "text": "resolution",
+        "is_correct": false,
+        "distractor_rationale": "resolution controls cell size, not the cost zone around obstacles."
+      },
+      {
+        "label": "B",
+        "text": "inflation_radius",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "update_frequency",
+        "is_correct": false,
+        "distractor_rationale": "update_frequency controls how often the costmap refreshes, not how much clearance the planner keeps from walls."
+      },
+      {
+        "label": "D",
+        "text": "transform_tolerance",
+        "is_correct": false,
+        "distractor_rationale": "transform_tolerance controls TF timing thresholds, not path clearance."
+      }
+    ],
+    "explanation": "inflation_radius expands the cost zone around obstacles in the costmap, forcing the global planner to route further from walls. The other parameters control resolution, refresh rate, and TF timing respectively.",
+    "source_excerpt": "The inflation_radius parameter in Nav2's costmap inflation layer defines the radius around obstacles that is marked with decreasing cost values, encouraging the planner to route away from walls.",
+    "source_heading": "Nav2 > Costmap > Inflation Layer > inflation_radius",
+    "bloom_level": "apply",
     "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "question_type": "single_correct"
   },
   {
-    "_comment": "EASY-5 | remember | single_correct | definition | deep sleep purpose",
-    "question": "What is the primary purpose of enabling deep sleep mode on a microcontroller?",
+    "_comment": "Q17 — Bloom: Understand. Reducing max_vel_x in DWB local planner.",
+    "stem_pattern": "scenario",
+    "question": "A developer reduces the DWB local planner's max_vel_x from 0.5 m/s to 0.1 m/s. What is the observed consequence?",
     "options": [
       {
         "label": "A",
-        "text": "To increase the clock frequency when the processor is idle.",
+        "text": "The robot stops executing recovery behaviours.",
         "is_correct": false,
-        "distractor_rationale": "The opposite is true; deep sleep reduces clock activity."
+        "distractor_rationale": "Recovery behaviours are triggered by being stuck, not by velocity limits."
       },
       {
         "label": "B",
-        "text": "To reduce power consumption to microamp levels during inactive periods.",
+        "text": "The robot moves slower but is less likely to overshoot goals.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "To allow over-the-air firmware updates without interrupting operation.",
+        "text": "The global planner replans more frequently.",
         "is_correct": false,
-        "distractor_rationale": "OTA updates require active Wi-Fi \u2014 incompatible with deep sleep."
+        "distractor_rationale": "The global planner runs independently of local velocity caps."
       },
       {
         "label": "D",
-        "text": "To prevent data loss by writing RAM contents to flash storage.",
+        "text": "The robot fails to reach goals in dynamic environments.",
         "is_correct": false,
-        "distractor_rationale": "Describes a hibernate-and-persist pattern; most MCU deep sleep modes do not automatically persist RAM."
+        "distractor_rationale": "At 0.1 m/s the robot is slow but still capable of reaching goals; failure to reach goals is associated with being blocked, not just being slow."
       }
     ],
-    "explanation": "Deep sleep powers down all non-essential subsystems, dropping current draw to the microamp range. This is critical for battery-powered IoT devices that spend most of their time idle.",
-    "source_excerpt": "Deep sleep mode reduces current consumption to the low microamp range by powering down the CPU, Wi-Fi, and most peripherals.",
-    "source_heading": "Power Management > Sleep Modes",
-    "bloom_level": "remember",
-    "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
-  },
-  {
-    "_comment": "EASY-6 | understand | single_correct | definition | actuator vs sensor",
-    "question": "A smoke detector converts air-quality data into an electrical signal. What type of IoT component is it?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Actuator",
-        "is_correct": false,
-        "distractor_rationale": "Actuators produce physical output; students sometimes confuse the two categories."
-      },
-      {
-        "label": "B",
-        "text": "Gateway",
-        "is_correct": false,
-        "distractor_rationale": "A gateway bridges networks; it does not sense the environment."
-      },
-      {
-        "label": "C",
-        "text": "Sensor",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "D",
-        "text": "Controller",
-        "is_correct": false,
-        "distractor_rationale": "A controller processes data and makes decisions; it does not directly sense the environment."
-      }
-    ],
-    "explanation": "A sensor converts a physical quantity into an electrical signal. The smoke detector measures air quality and converts that measurement \u2014 making it a sensor.",
-    "source_excerpt": "A sensor converts a physical parameter from the environment into an electrical signal for processing.",
-    "source_heading": "IoT Fundamentals > Components",
+    "explanation": "Capping forward speed makes the robot move more conservatively, reducing overshoot at goal positions. Recovery behaviours are triggered by being stuck, not by speed limits. The global planner runs independently of local velocity caps.",
+    "source_excerpt": "DWB's max_vel_x caps the maximum forward velocity the local planner will command. Lower values reduce overshoot at goals but increase time-to-goal.",
+    "source_heading": "Nav2 > DWB Local Planner > Velocity Limits",
     "bloom_level": "understand",
     "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "question_type": "single_correct"
   },
   {
-    "_comment": "EASY-7 | remember | single_correct | definition | I2C address purpose",
-    "question": "Why does every device on an I2C bus require a unique address?",
+    "_comment": "Q18 — Bloom: Analyze. Nav2 goal fails immediately with TF timeout error.",
+    "stem_pattern": "debugging",
+    "question": "A robot running Nav2 accepts a navigation goal in RViz, but the action immediately returns FAILED before the robot begins moving. The global costmap displays correctly, and the goal marker appears visually reachable. The terminal repeatedly shows messages similar to:\n\n```\nTimed out waiting for transform from base_link to map\n```\n\nWhat is the most likely cause?",
     "options": [
       {
         "label": "A",
-        "text": "To determine the clock speed at which that device communicates.",
+        "text": "The goal is inside the inflation layer, making the planner treat the goal cell as occupied.",
         "is_correct": false,
-        "distractor_rationale": "Clock speed on I2C is set by the master, not by device address."
+        "distractor_rationale": "A goal inside the inflation layer causes a planning failure with a 'no path found' message, not a TF timeout error."
       },
       {
         "label": "B",
-        "text": "To allow the master to target a specific device when multiple devices share the same two wires.",
+        "text": "The local planner simulation time is too short to generate valid trajectories.",
+        "is_correct": false,
+        "distractor_rationale": "Insufficient simulation time causes suboptimal or jerky movement, not an immediate FAILED before any motion begins."
+      },
+      {
+        "label": "C",
+        "text": "The Nav2 action server is not running, so the goal cannot be accepted.",
+        "is_correct": false,
+        "distractor_rationale": "If the action server were not running, the goal would not be accepted at all, not accepted and then failed with a TF error."
+      },
+      {
+        "label": "D",
+        "text": "transform_tolerance or TF timing configuration is too strict, causing transform lookup failures during planning.",
+        "is_correct": true,
+        "distractor_rationale": null
+      }
+    ],
+    "explanation": "Nav2 depends on valid TF transforms (map → odom → base_link) before planning can begin. If transforms are delayed, missing, or older than the configured transform_tolerance, Nav2 cannot determine the robot pose and immediately aborts the request, producing the 'Timed out waiting for transform' message.",
+    "source_excerpt": "Nav2 uses the TF tree to determine robot pose. If the transform lookup times out due to stale transforms or strict transform_tolerance settings, the planning pipeline aborts immediately.",
+    "source_heading": "Nav2 > Configuration > transform_tolerance",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q19 — Bloom: Apply. Correct sequence for Nav2 Simple Commander waypoint mission.",
+    "stem_pattern": "procedure",
+    "question": "A developer wants to send a robot on a three-waypoint mission using the Nav2 Simple Commander API. The 5 steps are listed out of order:\n\n1. Call follow_waypoints() with the list of three PoseStamped goals\n2. Initialize the BasicNavigator and call waitUntilNav2Active()\n3. Verify mission completion by checking getResult() returns SUCCEEDED\n4. Launch Nav2 with a saved map and confirm /amcl_pose is publishing\n5. Construct three PoseStamped objects with target positions and orientations\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "2 → 4 → 5 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Initialises BasicNavigator (2) before Nav2 is running (4) — waitUntilNav2Active() would block indefinitely."
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 5 → 1 → 3",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "To encrypt the data sent to each device individually.",
+        "text": "4 → 5 → 2 → 1 → 3",
         "is_correct": false,
-        "distractor_rationale": "I2C does not provide encryption; the address is for addressing only."
+        "distractor_rationale": "Constructs PoseStamped goals (5) before BasicNavigator exists (2) — the clock and frame context needed for stamping are not available."
       },
       {
         "label": "D",
-        "text": "To indicate the voltage level each device expects.",
+        "text": "2 → 5 → 4 → 1 → 3",
         "is_correct": false,
-        "distractor_rationale": "Voltage levels are a hardware concern independent of I2C addressing."
+        "distractor_rationale": "Same problem as A — initialises the navigator before Nav2 is running."
       }
     ],
-    "explanation": "I2C is a shared bus \u2014 all devices share SDA and SCL. The address in each transaction tells every device on the bus which one should respond.",
-    "source_excerpt": "Every I2C device has a unique 7-bit address so the master can address individual slaves on the shared bus.",
-    "source_heading": "Communication Protocols > I2C",
+    "explanation": "Nav2 must be launched first so localisation is active (4), then BasicNavigator initialises and waits for Nav2 to be ready (2), waypoints are constructed (5), the mission is sent (1), then the result is checked (3).",
+    "source_excerpt": "BasicNavigator.waitUntilNav2Active() blocks until the Nav2 lifecycle nodes are in the active state. Nav2 must be launched before calling this method.",
+    "source_heading": "Nav2 > Simple Commander API > BasicNavigator",
+    "bloom_level": "apply",
+    "difficulty": "medium",
+    "question_type": "ordering",
+    "ordering_statements": [
+      "Launch Nav2 with a saved map and confirm /amcl_pose is publishing",
+      "Initialize the BasicNavigator and call waitUntilNav2Active()",
+      "Construct three PoseStamped objects with target positions and orientations",
+      "Call follow_waypoints() with the list of three PoseStamped goals",
+      "Verify mission completion by checking getResult() returns SUCCEEDED"
+    ]
+  },
+  {
+    "_comment": "Q20 — Bloom: Remember. cv_bridge required to convert ROS image to OpenCV.",
+    "stem_pattern": "debugging",
+    "question": "A ROS 2 node subscribes to /camera/image_raw but OpenCV operations fail with a type error. The image message type is sensor_msgs/Image. What is the missing step?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Resize the image to a fixed resolution before processing.",
+        "is_correct": false,
+        "distractor_rationale": "Resizing is an optional processing step; it does not address the type incompatibility between sensor_msgs/Image and cv::Mat."
+      },
+      {
+        "label": "B",
+        "text": "Convert the message to a cv::Mat using cv_bridge.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Change the camera topic to publish CompressedImage instead.",
+        "is_correct": false,
+        "distractor_rationale": "CompressedImage is a different message type that requires additional decompression steps before OpenCV can process it."
+      },
+      {
+        "label": "D",
+        "text": "Enable the image_transport layer in the node.",
+        "is_correct": false,
+        "distractor_rationale": "image_transport handles transport plugins for efficient delivery; it does not convert message types to cv::Mat."
+      }
+    ],
+    "explanation": "cv_bridge converts sensor_msgs/Image to cv::Mat, which OpenCV operates on natively. Without this conversion, OpenCV receives a ROS message object and raises a type error.",
+    "source_excerpt": "cv_bridge provides CvBridge.imgmsg_to_cv2() to convert sensor_msgs/Image messages into OpenCV cv::Mat objects for processing.",
+    "source_heading": "ROS 2 Vision > cv_bridge > Image Conversion",
     "bloom_level": "remember",
     "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "question_type": "single_correct"
   },
   {
-    "_comment": "EASY-8 | understand | single_correct | definition | PWM duty cycle",
-    "question": "A PWM signal has a duty cycle of 25%. What does this mean?",
+    "_comment": "Q21 — Bloom: Understand. Lowering cv2.threshold() value includes more pixels as foreground.",
+    "stem_pattern": "scenario",
+    "question": "A developer lowers the threshold value in cv2.threshold() from 127 to 40 on a greyscale camera feed used for contour detection. What is the consequence?",
     "options": [
       {
         "label": "A",
-        "text": "The signal frequency is 25 Hz.",
+        "text": "Fewer contours are detected — only the brightest regions remain.",
         "is_correct": false,
-        "distractor_rationale": "Duty cycle and frequency are independent PWM parameters."
+        "distractor_rationale": "Fewer contours result from raising the threshold, not lowering it."
       },
       {
         "label": "B",
-        "text": "The signal is HIGH for 25% of each period and LOW for the remaining 75%.",
+        "text": "More contours are detected — darker regions are now included as foreground.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "The signal voltage is 25% of the supply voltage.",
+        "text": "Contour detection fails — threshold must be above 50 to function.",
         "is_correct": false,
-        "distractor_rationale": "PWM approximates variable voltage by switching, not by reducing actual voltage at any instant."
+        "distractor_rationale": "cv2.threshold() has no minimum value constraint; a value of 40 is valid and produces a binary image."
       },
       {
         "label": "D",
-        "text": "The device consumes 25% of its rated power.",
+        "text": "The image is inverted before contour detection runs.",
         "is_correct": false,
-        "distractor_rationale": "Power depends on the load and waveform together, not duty cycle alone."
+        "distractor_rationale": "Inversion is produced by the THRESH_BINARY_INV flag, not by changing the threshold value."
       }
     ],
-    "explanation": "Duty cycle is the proportion of one period for which the signal is HIGH. A 25% duty cycle means the output is HIGH for a quarter of each cycle.",
-    "source_excerpt": "Duty cycle is the percentage of time the PWM signal is HIGH within one period.",
-    "source_heading": "Microcontroller Peripherals > PWM",
+    "explanation": "Lowering the threshold classifies more pixels as foreground (any pixel with intensity ≥ 40 instead of ≥ 127), including darker regions, producing more and larger binary regions from which contours are extracted.",
+    "source_excerpt": "In cv2.threshold() with THRESH_BINARY, pixels at or above the threshold value become white (foreground) and pixels below become black. A lower threshold includes more pixels as foreground.",
+    "source_heading": "ROS 2 Vision > OpenCV Integration > Thresholding",
     "bloom_level": "understand",
     "difficulty": "easy",
-    "question_type": "single_correct",
-    "stem_pattern": "definition"
+    "question_type": "single_correct"
   },
   {
-    "_comment": "MEDIUM-1 | apply | single_correct | scenario | QoS selection",
-    "question": "An ESP32-S3 device must send sensor readings every 5 minutes to a cloud broker over an unreliable mobile network. The device runs on a small battery and must operate for months without recharging. Which communication pattern best meets these requirements?",
+    "_comment": "Q22 — Bloom: Analyze. ArUco pose jitter due to wrong marker size parameter.",
+    "stem_pattern": "debugging",
+    "question": "An ArUco marker is detected consistently in the camera image, but the published pose in RViz drifts and jitters even when the marker is stationary. The camera is calibrated and the marker ID is correct. What is the most likely cause?",
     "options": [
       {
         "label": "A",
-        "text": "HTTP POST with retry-on-failure to a REST endpoint",
-        "is_correct": false,
-        "distractor_rationale": "HTTP is connection-oriented and verbose; each request requires a TCP handshake, which is expensive on battery-powered hardware."
-      },
-      {
-        "label": "B",
-        "text": "MQTT QoS 1 with a persistent session to a broker",
+        "text": "The marker size passed to aruco.estimatePoseSingleMarkers() is wrong.",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
-        "label": "C",
-        "text": "WebSocket connection kept open continuously to the broker",
-        "is_correct": false,
-        "distractor_rationale": "A persistent WebSocket requires the radio to stay active, which would drain the battery far faster than periodic wake-and-transmit."
-      },
-      {
-        "label": "D",
-        "text": "UDP multicast to all devices on the local network",
-        "is_correct": false,
-        "distractor_rationale": "Multicast is for local network broadcast, not cloud communication, and UDP has no delivery guarantee."
-      }
-    ],
-    "explanation": "MQTT QoS 1 guarantees at-least-once delivery and a persistent session allows the broker to queue messages when the device is disconnected. Together these handle unreliable connectivity without keeping the radio permanently on.",
-    "source_excerpt": "MQTT with QoS 1 and persistent sessions is recommended for battery-powered devices on unreliable networks \u2014 the broker queues messages during disconnection and the device can sleep between transmissions.",
-    "source_heading": "Communication Protocols > MQTT > Practical Selection",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "scenario"
-  },
-  {
-    "_comment": "MEDIUM-2 | apply | single_correct | scenario | code reading \u2014 sleep config",
-    "question": "An engineer writes the following code to put an ESP32-S3 to sleep:\n\nesp_sleep_enable_timer_wakeup(30 * 1000000);\nesp_deep_sleep_start();\n\nThe device wakes every 30 seconds as expected, but current draw in sleep is measured at 2.5 mA instead of the expected 10 \u00b5A. What is the most likely cause?",
-    "options": [
-      {
-        "label": "A",
-        "text": "The wakeup timer value is set in milliseconds rather than microseconds, causing the device to wake too frequently.",
-        "is_correct": false,
-        "distractor_rationale": "The timer value of 30 \u00d7 1,000,000 is correct for 30 seconds in microseconds; wakeup interval is fine."
-      },
-      {
         "label": "B",
-        "text": "A peripheral \u2014 such as Wi-Fi or a UART \u2014 is not explicitly powered down before calling esp_deep_sleep_start().",
-        "is_correct": true,
-        "distractor_rationale": null
+        "text": "The pose is published without a fixed timestamp — it uses ros::Time::now() per frame.",
+        "is_correct": false,
+        "distractor_rationale": "Per-frame timestamps are normal practice and do not cause jitter in static marker pose; this would cause TF timing issues, not spatial noise."
       },
       {
         "label": "C",
-        "text": "Deep sleep cannot be used with a timer wakeup source; the device falls back to light sleep.",
+        "text": "The camera_info topic is not being subscribed to, so intrinsics are unavailable.",
         "is_correct": false,
-        "distractor_rationale": "Timer wakeup is a supported deep sleep source on ESP32-S3."
+        "distractor_rationale": "Without camera intrinsics, estimatePoseSingleMarkers() would fail entirely, not produce jittery poses."
       },
       {
         "label": "D",
-        "text": "The supply voltage is too high, causing the sleep current to exceed specification.",
+        "text": "The marker dictionary does not match the one used to generate the printed marker.",
         "is_correct": false,
-        "distractor_rationale": "Sleep current is largely independent of supply voltage within the rated operating range."
+        "distractor_rationale": "A dictionary mismatch would prevent detection entirely or produce incorrect IDs — not cause stable detection with jittery pose."
       }
     ],
-    "explanation": "On ESP32-S3, peripherals such as Wi-Fi, UART, and I2C retain power unless explicitly disabled before entering deep sleep. Leaving them on is the most common cause of unexpectedly high sleep current.",
-    "source_excerpt": "Before calling esp_deep_sleep_start(), all active peripherals must be explicitly disabled. Leaving Wi-Fi or UART active is the most common cause of elevated sleep current.",
-    "source_heading": "Power Management > Deep Sleep Configuration",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
-  },
-  {
-    "_comment": "MEDIUM-3 | apply | single_correct | comparison | I2C vs SPI choice",
-    "question": "A developer needs to connect an OLED display and a temperature sensor to a microcontroller using the fewest possible wires. Both devices support I2C and SPI. Which interface should the developer choose and why?",
-    "options": [
-      {
-        "label": "A",
-        "text": "SPI, because it supports higher data rates and is therefore always preferred for displays.",
-        "is_correct": false,
-        "distractor_rationale": "SPI is faster but requires four wires per device plus chip-select lines \u2014 more wires, not fewer."
-      },
-      {
-        "label": "B",
-        "text": "I2C, because multiple devices share only two wires (SDA and SCL), and each is addressed individually.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "I2C, because it does not require a clock signal and is simpler to implement.",
-        "is_correct": false,
-        "distractor_rationale": "I2C does use a clock line (SCL); this answer describes a one-wire interface incorrectly."
-      },
-      {
-        "label": "D",
-        "text": "SPI, because it allows devices to share a chip-select line and reduces wiring.",
-        "is_correct": false,
-        "distractor_rationale": "Each SPI device requires its own chip-select line; sharing is not supported."
-      }
-    ],
-    "explanation": "I2C uses only SDA and SCL regardless of how many devices are connected. Each device has a unique address, so two devices share the same two wires with no extra lines.",
-    "source_excerpt": "I2C connects multiple devices using only two wires \u2014 SDA and SCL \u2014 with each device identified by a unique address.",
-    "source_heading": "Communication Protocols > I2C vs SPI",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "comparison"
-  },
-  {
-    "_comment": "MEDIUM-4 | apply | single_correct | scenario | MQTT topic design",
-    "question": "A factory deploys 200 sensors across three zones (A, B, C). An operations dashboard needs to display readings from all sensors in Zone B in real time. Which MQTT topic subscription achieves this most efficiently?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Subscribe to factory/+/sensor/# to receive all readings from all zones.",
-        "is_correct": false,
-        "distractor_rationale": "This receives data from all three zones, not just Zone B \u2014 wasteful bandwidth."
-      },
-      {
-        "label": "B",
-        "text": "Subscribe to factory/zoneB/sensor/+ to receive readings from all sensors in Zone B.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Subscribe to factory/# and filter Zone B messages in application code.",
-        "is_correct": false,
-        "distractor_rationale": "Receives all factory data and filters client-side \u2014 inefficient when the broker can filter at source."
-      },
-      {
-        "label": "D",
-        "text": "Subscribe to factory/zoneB/# to receive all zoneB messages including non-sensor topics.",
-        "is_correct": false,
-        "distractor_rationale": "# also matches sub-topics beyond /sensor/, potentially receiving control messages or metadata not needed by the dashboard."
-      }
-    ],
-    "explanation": "The single-level wildcard + matches exactly one topic level. factory/zoneB/sensor/+ matches every sensor in Zone B and nothing else.",
-    "source_excerpt": "The single-level wildcard + matches exactly one topic level. The multi-level wildcard # matches all remaining levels from that point downward.",
-    "source_heading": "Communication Protocols > MQTT > Topic Wildcards",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "scenario"
-  },
-  {
-    "_comment": "MEDIUM-5 | apply | single_correct | procedure | OTA update steps",
-    "question": "A developer is about to push an OTA firmware update to a fleet of 500 deployed ESP32-S3 devices. Before initiating the update, which step is most critical to prevent bricking devices?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Disable all MQTT subscriptions on the devices so the update is not interrupted by incoming messages.",
-        "is_correct": false,
-        "distractor_rationale": "MQTT activity does not interrupt an OTA partition write; this step is unnecessary."
-      },
-      {
-        "label": "B",
-        "text": "Verify the new firmware binary with a cryptographic signature or hash before deploying.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Put all devices into deep sleep to reduce power consumption during the update.",
-        "is_correct": false,
-        "distractor_rationale": "Deep sleep interrupts the update; devices must remain active throughout."
-      },
-      {
-        "label": "D",
-        "text": "Reset the NVS partition on each device to clear stale configuration before the update.",
-        "is_correct": false,
-        "distractor_rationale": "Clearing NVS destroys configuration data; this is not a standard pre-update step."
-      }
-    ],
-    "explanation": "A corrupted or unsigned binary can render devices unresponsive after flashing. Verifying integrity before deployment is the single most important safeguard against mass bricking.",
-    "source_excerpt": "Always verify the firmware binary's integrity with a cryptographic hash or signature before initiating an OTA update to a device fleet.",
-    "source_heading": "Firmware Management > OTA Updates > Best Practices",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "procedure"
-  },
-  {
-    "_comment": "MEDIUM-6 | apply | single_correct | scenario | ADC resolution",
-    "question": "A soil moisture sensor outputs a voltage between 0 V and 3.3 V. An ESP32-S3 reads this with its 12-bit ADC. Approximately how many discrete moisture levels can be distinguished?",
-    "options": [
-      {
-        "label": "A",
-        "text": "256",
-        "is_correct": false,
-        "distractor_rationale": "256 is 2^8 \u2014 the resolution of an 8-bit ADC."
-      },
-      {
-        "label": "B",
-        "text": "1024",
-        "is_correct": false,
-        "distractor_rationale": "1024 is 2^10 \u2014 the resolution of a 10-bit ADC."
-      },
-      {
-        "label": "C",
-        "text": "4096",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "D",
-        "text": "65536",
-        "is_correct": false,
-        "distractor_rationale": "65536 is 2^16 \u2014 a 16-bit ADC. ESP32-S3 has a 12-bit ADC."
-      }
-    ],
-    "explanation": "A 12-bit ADC produces 2^12 = 4096 distinct values across the input range. This determines the finest granularity with which the sensor signal can be represented digitally.",
-    "source_excerpt": "The ESP32-S3 integrates a 12-bit SAR ADC, providing 4096 quantisation levels across the input voltage range.",
-    "source_heading": "Microcontroller Peripherals > ADC",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "scenario"
-  },
-  {
-    "_comment": "MEDIUM-7 | apply | single_correct | debugging | NVS key not found",
-    "question": "An ESP32-S3 application reads a Wi-Fi password from NVS on every boot. After a factory reset, the device panics with 'ESP_ERR_NVS_NOT_FOUND'. What is the correct way to handle this condition?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Catch the error and halt the device, because NVS corruption requires reflashing.",
-        "is_correct": false,
-        "distractor_rationale": "NOT_FOUND means the key was never written, not that NVS is corrupted."
-      },
-      {
-        "label": "B",
-        "text": "Catch the error, fall back to a default value or provisioning mode, and write the key before the next boot.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Retry the NVS read in a loop until the key becomes available.",
-        "is_correct": false,
-        "distractor_rationale": "The key will never appear by retrying if it was never written; this creates an infinite loop."
-      },
-      {
-        "label": "D",
-        "text": "Erase the entire NVS partition and restart to resolve the error.",
-        "is_correct": false,
-        "distractor_rationale": "Erasing NVS destroys all stored data; the correct response is to provision the missing key."
-      }
-    ],
-    "explanation": "ESP_ERR_NVS_NOT_FOUND indicates the key does not yet exist in storage \u2014 typical after a factory reset. The application should handle it gracefully by entering a provisioning flow rather than treating it as a fatal error.",
-    "source_excerpt": "If nvs_get_str returns ESP_ERR_NVS_NOT_FOUND, the key has not yet been written. Handle this case by entering provisioning mode rather than treating it as a fatal error.",
-    "source_heading": "Storage > NVS > Error Handling",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
-  },
-  {
-    "_comment": "MEDIUM-8 | apply | single_correct | code-reading | FreeRTOS task creation",
-    "question": "A developer creates two FreeRTOS tasks:\n\nxTaskCreate(sensorTask, 'Sensor', 2048, NULL, 2, NULL);\nxTaskCreate(publishTask, 'Publish', 4096, NULL, 1, NULL);\n\nBoth tasks are ready to run simultaneously. Which task will the scheduler execute first?",
-    "options": [
-      {
-        "label": "A",
-        "text": "sensorTask, because it was created first and is therefore at the front of the ready queue.",
-        "is_correct": false,
-        "distractor_rationale": "FreeRTOS uses priority-based scheduling, not creation order."
-      },
-      {
-        "label": "B",
-        "text": "publishTask, because it has a larger stack size and is therefore considered more important.",
-        "is_correct": false,
-        "distractor_rationale": "Stack size has no bearing on scheduling priority."
-      },
-      {
-        "label": "C",
-        "text": "sensorTask, because it has the higher priority value (2 > 1).",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "D",
-        "text": "Both tasks run simultaneously because FreeRTOS supports true parallel execution on single-core configurations.",
-        "is_correct": false,
-        "distractor_rationale": "On a single core, only one task runs at a time; concurrency is achieved by time-slicing, not true parallelism."
-      }
-    ],
-    "explanation": "FreeRTOS selects the highest-priority ready task to run. sensorTask is created with priority 2 while publishTask has priority 1, so sensorTask runs first.",
-    "source_excerpt": "FreeRTOS always runs the highest-priority task that is in the Ready state. If two tasks share the same priority, they are time-sliced.",
-    "source_heading": "RTOS Fundamentals > FreeRTOS > Scheduling",
-    "bloom_level": "apply",
-    "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
-  },
-  {
-    "_comment": "HARD-1 | analyze | single_correct | debugging | deep sleep current",
-    "question": "An ESP32-S3 product is designed to run on a 1000 mAh battery for six months, waking every 10 minutes to take a reading and publish via MQTT. After deployment, batteries drain in three weeks. Current measurement during sleep shows 8 mA instead of the expected 15 \u00b5A. Which single configuration error most likely explains this?",
-    "options": [
-      {
-        "label": "A",
-        "text": "The MQTT QoS level is set to 2, causing excessive retransmissions that prevent the radio from sleeping.",
-        "is_correct": false,
-        "distractor_rationale": "QoS 2 retransmissions occur during active mode, not during sleep; they would not keep the device awake at 8 mA continuously."
-      },
-      {
-        "label": "B",
-        "text": "The Wi-Fi driver is not explicitly stopped before calling esp_deep_sleep_start(), keeping the radio active.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "The wakeup timer interval is set in milliseconds rather than microseconds, causing wakeups every 10 \u00b5s.",
-        "is_correct": false,
-        "distractor_rationale": "A 10 \u00b5s wakeup interval would cause measurably different behaviour \u2014 extremely rapid wakeup cycling \u2014 not a steady 8 mA sleep current."
-      },
-      {
-        "label": "D",
-        "text": "The ADC is sampling continuously in a background task that was not deleted before entering sleep.",
-        "is_correct": false,
-        "distractor_rationale": "A running task would prevent deep sleep entry entirely; the device would not show a consistent sleep current."
-      }
-    ],
-    "explanation": "8 mA is consistent with Wi-Fi modem-sleep or active-mode radio, not deep sleep. The most common cause of elevated deep sleep current is failing to call esp_wifi_stop() before esp_deep_sleep_start().",
-    "source_excerpt": "Failing to stop the Wi-Fi driver before entering deep sleep is the leading cause of unexpectedly high sleep current \u2014 the radio remains partially active even after the CPU sleeps.",
-    "source_heading": "Power Management > Deep Sleep > Common Pitfalls",
+    "explanation": "aruco.estimatePoseSingleMarkers() uses the physical marker size to compute depth via perspective projection. An incorrect size scales the Z-axis estimate wrongly, and pixel-level detection jitter gets amplified into large pose errors at distance.",
+    "source_excerpt": "The markerLength parameter in aruco.estimatePoseSingleMarkers() must match the physical size of the printed marker in metres. An incorrect value introduces a constant depth scaling error that amplifies pixel-level noise into significant pose jitter.",
+    "source_heading": "ROS 2 Vision > ArUco Marker Detection > Pose Estimation",
     "bloom_level": "analyze",
     "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
+    "question_type": "single_correct"
   },
   {
-    "_comment": "HARD-2 | analyze | single_correct | comparison | QoS 1 vs QoS 2",
-    "question": "A medical wearable sends patient heart-rate alerts to a cloud platform. Each alert must arrive exactly once \u2014 duplicates could trigger false alarms in the monitoring system. Network conditions are variable. Which MQTT QoS level and session type should the system use?",
+    "_comment": "Q23 — Bloom: Apply. Correct sequence to detect ArUco marker and publish pose.",
+    "stem_pattern": "procedure",
+    "question": "A developer wants to detect an ArUco marker from a ROS 2 camera topic and publish its pose relative to the camera frame. The 5 steps are listed out of order:\n\n1. Call aruco.estimatePoseSingleMarkers() using camera intrinsics from camera_info\n2. Subscribe to /camera/image_raw and /camera/camera_info topics\n3. Convert the detected marker pose to a geometry_msgs/PoseStamped and publish it\n4. Convert the incoming image message to a cv::Mat using cv_bridge\n5. Run aruco.detectMarkers() on the greyscale image to get marker corners\n\nWhich sequence is correct?",
     "options": [
       {
         "label": "A",
-        "text": "QoS 0 with a clean session, to minimise network overhead on a constrained device.",
-        "is_correct": false,
-        "distractor_rationale": "QoS 0 has no delivery guarantee; alerts can be lost silently."
-      },
-      {
-        "label": "B",
-        "text": "QoS 1 with a persistent session, to guarantee delivery with low overhead.",
-        "is_correct": false,
-        "distractor_rationale": "QoS 1 guarantees at-least-once delivery but allows duplicates \u2014 unacceptable for this scenario."
-      },
-      {
-        "label": "C",
-        "text": "QoS 2 with a persistent session, to guarantee exactly-once delivery.",
+        "text": "2 → 4 → 5 → 1 → 3",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
-        "label": "D",
-        "text": "QoS 2 with a clean session, to guarantee exactly-once delivery while clearing stale state on reconnect.",
-        "is_correct": false,
-        "distractor_rationale": "A clean session discards the broker's queued messages on reconnect, which could cause alerts sent during disconnection to be lost."
-      }
-    ],
-    "explanation": "QoS 2 uses a four-part handshake to guarantee exactly-once delivery. A persistent session ensures queued alerts are delivered after reconnection rather than discarded.",
-    "source_excerpt": "QoS 2 guarantees exactly-once delivery using a four-part handshake. A persistent session retains queued messages across disconnections.",
-    "source_heading": "Communication Protocols > MQTT > Quality of Service",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "comparison"
-  },
-  {
-    "_comment": "HARD-3 | analyze | single_correct | debugging | I2C ACK failure",
-    "question": "A developer connects a temperature sensor (I2C address 0x48) and an OLED display (I2C address 0x3C) to an ESP32-S3. After initialisation, the sensor reads correctly but the display never responds. An oscilloscope shows the SDA line stays HIGH during display address frames. What is the most likely cause?",
-    "options": [
-      {
-        "label": "A",
-        "text": "The I2C clock speed is too high for the display; the sensor is faster and responds first.",
-        "is_correct": false,
-        "distractor_rationale": "A clock speed mismatch would cause intermittent failures on both devices, not silence on one only."
-      },
-      {
         "label": "B",
-        "text": "The display's I2C address has been reconfigured to a different value by an address-select pin, and the firmware is targeting the wrong address.",
-        "is_correct": true,
-        "distractor_rationale": null
+        "text": "4 → 2 → 5 → 1 → 3",
+        "is_correct": false,
+        "distractor_rationale": "Attempts to convert a message (4) before subscribing to any topic (2) — no image data is available yet."
       },
       {
         "label": "C",
-        "text": "The SDA and SCL lines are swapped for the display but not the sensor.",
+        "text": "2 → 5 → 4 → 1 → 3",
         "is_correct": false,
-        "distractor_rationale": "Swapped SDA/SCL would prevent any I2C communication entirely; the sensor would also fail."
+        "distractor_rationale": "Runs detectMarkers() (5) on the raw ROS message before cv_bridge conversion (4) — OpenCV cannot operate on a sensor_msgs/Image directly."
       },
       {
         "label": "D",
-        "text": "The display requires 5 V I2C logic levels and is not tolerating the 3.3 V signal from the ESP32-S3.",
+        "text": "2 → 4 → 1 → 5 → 3",
         "is_correct": false,
-        "distractor_rationale": "A voltage mismatch could cause unreliable response but would not cause a perfectly flat SDA line; some partial ACKs would typically appear."
+        "distractor_rationale": "Calls estimatePoseSingleMarkers() (1) before detectMarkers() (5) has produced the corner coordinates needed as input."
       }
     ],
-    "explanation": "Many I2C peripherals have address-select pins (often labelled ADDR or A0) that allow the hardware address to be changed. If the pin is wired differently from the assumed state, the firmware targets the wrong address and the SDA line remains HIGH because no device acknowledges.",
-    "source_excerpt": "I2C device addresses can be modified via address-select pins. Always verify the physical pin state matches the address used in firmware.",
-    "source_heading": "Communication Protocols > I2C > Device Addressing",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
-  },
-  {
-    "_comment": "HARD-4 | analyze | single_correct | comparison | edge vs cloud processing",
-    "question": "A factory installs vibration sensors on 50 CNC machines. Each sensor produces 10 kB of raw data per second. A cloud analytics platform detects anomalies. Sending all raw data over cellular costs $800/month and introduces 200 ms latency. Which architecture change best reduces cost and latency simultaneously?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Increase MQTT QoS from 0 to 2 to ensure all vibration data reaches the cloud reliably.",
-        "is_correct": false,
-        "distractor_rationale": "Higher QoS increases overhead and cost \u2014 the opposite of the goal."
-      },
-      {
-        "label": "B",
-        "text": "Deploy an edge processor on each machine to extract anomaly features locally and transmit only feature vectors to the cloud.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Compress raw sensor data with gzip before transmission to reduce bandwidth usage.",
-        "is_correct": false,
-        "distractor_rationale": "Compression reduces bandwidth somewhat but still sends all data; it does not address latency and the savings are modest on sensor data."
-      },
-      {
-        "label": "D",
-        "text": "Batch sensor readings into hourly uploads to reduce the number of MQTT connections.",
-        "is_correct": false,
-        "distractor_rationale": "Batching dramatically increases latency and does not help with anomaly detection that requires near-real-time analysis."
-      }
-    ],
-    "explanation": "Edge processing extracts meaningful features (e.g., FFT peaks, RMS) locally and sends only those summaries to the cloud. This reduces data volume by orders of magnitude and eliminates network round-trip latency for local decision-making.",
-    "source_excerpt": "Edge computing reduces bandwidth and latency by processing data locally and transmitting only relevant features or decisions to the cloud.",
-    "source_heading": "IoT Architecture > Edge Computing",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "comparison"
-  },
-  {
-    "_comment": "HARD-5 | analyze | single_correct | debugging | FreeRTOS stack overflow",
-    "question": "An ESP32-S3 application runs two FreeRTOS tasks. After 48 hours of operation, the device crashes with a stack overflow exception on taskB. The developer allocated 2048 bytes of stack to taskB. Which of the following is the most structurally correct fix?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Increase taskB's stack to 8192 bytes and redeploy.",
-        "is_correct": false,
-        "distractor_rationale": "Increasing stack without profiling masks the root cause and wastes RAM \u2014 not a structurally correct fix."
-      },
-      {
-        "label": "B",
-        "text": "Profile taskB's maximum stack usage with uxTaskGetStackHighWaterMark() and allocate stack based on measured peak usage plus a safety margin.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Reduce taskB's priority so it runs less frequently and therefore uses less stack.",
-        "is_correct": false,
-        "distractor_rationale": "Stack depth is determined by call depth and local variable usage, not by how often a task runs."
-      },
-      {
-        "label": "D",
-        "text": "Switch taskB to a timer callback to avoid needing a dedicated stack.",
-        "is_correct": false,
-        "distractor_rationale": "Timer callbacks have their own (typically smaller) stack and are inappropriate for tasks with significant call depth."
-      }
-    ],
-    "explanation": "uxTaskGetStackHighWaterMark() returns the minimum ever recorded free stack space. Measuring this at runtime gives an evidence-based minimum allocation, which should then have a safety margin added.",
-    "source_excerpt": "Use uxTaskGetStackHighWaterMark() to measure the minimum free stack during operation and size the stack allocation accordingly.",
-    "source_heading": "RTOS Fundamentals > FreeRTOS > Stack Management",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
-  },
-  {
-    "_comment": "HARD-6 | analyze | single_correct | comparison | BLE vs Wi-Fi for wearable",
-    "question": "A smartwatch must stream heart-rate data to a paired smartphone at 50 samples per second while running on a 180 mAh battery for 18 hours. Which wireless technology is more appropriate and why?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Wi-Fi, because it has higher throughput and lower latency than BLE.",
-        "is_correct": false,
-        "distractor_rationale": "Wi-Fi throughput is overkill for 50 samples/sec and draws 10\u201320\u00d7 more current than BLE in continuous use."
-      },
-      {
-        "label": "B",
-        "text": "BLE, because its connection-oriented mode provides continuous low-power streaming to a paired central device.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Wi-Fi with power-save mode, because it can achieve the same power level as BLE while offering higher bandwidth.",
-        "is_correct": false,
-        "distractor_rationale": "Wi-Fi power-save mode still consumes significantly more current than BLE; BLE remains the better choice at this data rate."
-      },
-      {
-        "label": "D",
-        "text": "BLE advertising, because it broadcasts data without requiring a connection and therefore uses the least power.",
-        "is_correct": false,
-        "distractor_rationale": "BLE advertising is for discovery and short data bursts; continuous 50 samples/sec streaming requires a connection, not advertising."
-      }
-    ],
-    "explanation": "BLE connection mode provides continuous bidirectional data transfer with current consumption in the single-milliamp range, making it suitable for long-duration wearable applications at low data rates.",
-    "source_excerpt": "BLE connection mode is designed for continuous low-power data exchange between two paired devices and is preferred for wearable applications requiring all-day battery life.",
-    "source_heading": "Communication Protocols > BLE > Use Cases",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "comparison"
-  },
-  {
-    "_comment": "EXPERT-1 | evaluate | single_correct | comparison | protocol architecture for fleet",
-    "question": "A startup is designing a fleet of 10,000 battery-powered agricultural sensors. Each sensor reports soil temperature once per hour over a cellular network. Requirements: battery life \u2265 2 years, monthly data cost \u2264 $0.01 per device, and firmware must be updatable remotely. Which architecture best satisfies all three constraints?",
-    "options": [
-      {
-        "label": "A",
-        "text": "HTTPS REST API with JWT authentication, hourly POST requests, and OTA via HTTPS download triggered by a server push.",
-        "is_correct": false,
-        "distractor_rationale": "HTTPS has high per-connection overhead (TLS handshake); at hourly intervals the overhead-to-payload ratio is unfavourable for both cost and battery."
-      },
-      {
-        "label": "B",
-        "text": "MQTT over TLS with QoS 0, LTE-M radio in PSM mode, and OTA images delivered via MQTT topics.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "UDP with a custom application protocol, no encryption, and OTA via TFTP.",
-        "is_correct": false,
-        "distractor_rationale": "UDP with no encryption fails regulatory requirements for agricultural data in most regions; TFTP has no authentication, making OTA insecure."
-      },
-      {
-        "label": "D",
-        "text": "MQTT over TLS with QoS 2, always-on LTE connection, and OTA via HTTPS.",
-        "is_correct": false,
-        "distractor_rationale": "QoS 2's four-part handshake and an always-on LTE radio would destroy battery life and cost targets simultaneously."
-      }
-    ],
-    "explanation": "LTE-M PSM (Power Saving Mode) allows the radio to sleep for hours between transmissions. MQTT QoS 0 minimises overhead for non-critical telemetry. Together they keep both current draw and per-message data cost near the minimum while retaining OTA capability through MQTT.",
-    "source_excerpt": "LTE-M with PSM and MQTT QoS 0 is the recommended combination for battery-powered cellular IoT devices requiring multi-year operation at low reporting frequency.",
-    "source_heading": "IoT Architecture > Cellular IoT > Design Patterns",
-    "bloom_level": "evaluate",
-    "difficulty": "expert",
-    "question_type": "single_correct",
-    "stem_pattern": "comparison"
-  },
-  {
-    "_comment": "EXPERT-2 | evaluate | single_correct | scenario | security threat modelling",
-    "question": "An IoT gateway aggregates data from 200 industrial sensors and forwards it to a cloud SCADA platform. The gateway runs Linux, exposes MQTT port 1883 externally, has SSH enabled on port 22 with password authentication, and uses self-signed TLS certificates. A security auditor flags three vulnerabilities. Which remediation addresses the highest-risk exposure first?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Replace self-signed TLS certificates with CA-signed certificates to improve trust chain validation.",
-        "is_correct": false,
-        "distractor_rationale": "Self-signed certificates reduce auditability but do not expose the system to unauthenticated remote access as directly as open MQTT or SSH."
-      },
-      {
-        "label": "B",
-        "text": "Restrict MQTT port 1883 to internal network interfaces and require TLS on port 8883 for external connections.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Disable SSH and use a serial console for all local administration.",
-        "is_correct": false,
-        "distractor_rationale": "SSH with password auth is a significant risk but can be hardened by disabling password auth in favour of keys \u2014 disabling SSH entirely sacrifices remote management without adequate justification."
-      },
-      {
-        "label": "D",
-        "text": "Enable MQTT authentication with username and password to prevent unauthorised publishing.",
-        "is_correct": false,
-        "distractor_rationale": "Username/password over plaintext MQTT 1883 transmits credentials in the clear \u2014 adding auth without encryption provides marginal improvement."
-      }
-    ],
-    "explanation": "Exposing plaintext MQTT on port 1883 externally allows any network-reachable attacker to inject or intercept industrial control data without any authentication or encryption. This is the highest-risk exposure. Restricting 1883 to the internal interface and requiring TLS on 8883 closes the most critical gap.",
-    "source_excerpt": "MQTT port 1883 transmits data in plaintext with no authentication by default. Exposing it to external networks on industrial gateways is classified as a critical misconfiguration.",
-    "source_heading": "IoT Security > Gateway Configuration > Common Vulnerabilities",
-    "bloom_level": "evaluate",
-    "difficulty": "expert",
-    "question_type": "single_correct",
-    "stem_pattern": "scenario"
-  },
-  {
-    "_comment": "EXPERT-3 | evaluate | single_correct | comparison | OTA strategy at scale",
-    "question": "A company operates 80,000 ESP32-S3 devices across five continents. A critical security patch must reach all devices within 72 hours. Devices are on diverse networks including LTE-M, NB-IoT, and Wi-Fi. What OTA strategy minimises risk of mass failure while meeting the 72-hour deadline?",
-    "options": [
-      {
-        "label": "A",
-        "text": "Push the update simultaneously to all 80,000 devices to complete the rollout as fast as possible.",
-        "is_correct": false,
-        "distractor_rationale": "A simultaneous rollout means a firmware bug affects all devices at once with no opportunity to detect and abort."
-      },
-      {
-        "label": "B",
-        "text": "Roll out the update in progressive waves \u2014 1% then 10% then 50% then 100% \u2014 with automated health checks and rollback triggers between waves.",
-        "is_correct": true,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Require each device to manually confirm the update to ensure operator awareness before installation.",
-        "is_correct": false,
-        "distractor_rationale": "Manual confirmation on 80,000 devices is operationally infeasible within a 72-hour window."
-      },
-      {
-        "label": "D",
-        "text": "Deliver the patch only to devices connected via Wi-Fi, since LTE-M and NB-IoT have insufficient bandwidth for firmware transfers.",
-        "is_correct": false,
-        "distractor_rationale": "NB-IoT and LTE-M are designed for small data payloads but can handle firmware transfer at lower speeds \u2014 excluding them would leave the majority of devices unpatched."
-      }
-    ],
-    "explanation": "Progressive rollout with automated health gates allows the team to detect boot-loop failures or connectivity regressions at small scale and roll back before the blast radius grows. This is the standard production OTA strategy for large fleets.",
-    "source_excerpt": "Large-scale OTA deployments should use progressive rollout with automated rollback triggers to limit the impact of a defective firmware release.",
-    "source_heading": "Firmware Management > OTA at Scale",
-    "bloom_level": "evaluate",
-    "difficulty": "expert",
-    "question_type": "single_correct",
-    "stem_pattern": "comparison"
-  },
-  {
-    "_comment": "ORDERING-1 | apply | ordering | procedure | boot sequence steps",
-    "question": "Arrange the following steps in the correct order for initialising an MQTT connection on an ESP32-S3 after power-on.",
-    "options": [
-      {
-        "label": "A",
-        "text": "Call esp_mqtt_client_start() to connect to the broker.",
-        "is_correct": false,
-        "distractor_rationale": null
-      },
-      {
-        "label": "B",
-        "text": "Initialise the Wi-Fi driver and connect to the access point.",
-        "is_correct": false,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Configure the MQTT client with broker URI and credentials.",
-        "is_correct": false,
-        "distractor_rationale": null
-      },
-      {
-        "label": "D",
-        "text": "Wait for the IP_EVENT_STA_GOT_IP event before proceeding.",
-        "is_correct": false,
-        "distractor_rationale": null
-      }
-    ],
-    "correct_order": [
-      "B",
-      "D",
-      "C",
-      "A"
-    ],
-    "explanation": "Wi-Fi must connect first (B). The application waits for a valid IP address (D) before configuring the MQTT client (C) and then starting the connection (A). Starting MQTT without a valid IP causes an immediate connection error.",
-    "source_excerpt": "The correct initialisation sequence is: connect Wi-Fi, wait for IP assignment, configure MQTT client, then call esp_mqtt_client_start().",
-    "source_heading": "Communication Protocols > MQTT > Initialisation",
+    "explanation": "Subscribe to both topics first to receive image and intrinsics (2), convert to cv::Mat via cv_bridge (4), detect marker corners (5), estimate pose using intrinsics (1), then convert and publish the pose (3).",
+    "source_excerpt": "ArUco pose estimation requires: (1) a cv::Mat image from cv_bridge, (2) corner detection via detectMarkers(), and (3) pose estimation via estimatePoseSingleMarkers() using camera intrinsics.",
+    "source_heading": "ROS 2 Vision > ArUco Marker Detection > Pipeline",
     "bloom_level": "apply",
     "difficulty": "medium",
     "question_type": "ordering",
-    "stem_pattern": "procedure"
+    "ordering_statements": [
+      "Subscribe to /camera/image_raw and /camera/camera_info topics",
+      "Convert the incoming image message to a cv::Mat using cv_bridge",
+      "Run aruco.detectMarkers() on the greyscale image to get marker corners",
+      "Call aruco.estimatePoseSingleMarkers() using camera intrinsics from camera_info",
+      "Convert the detected marker pose to a geometry_msgs/PoseStamped and publish it"
+    ]
   },
   {
-    "_comment": "ORDERING-2 | apply | ordering | procedure | OTA update sequence",
-    "question": "Place the following OTA update steps in the correct order.",
+    "_comment": "Q24 — Bloom: Analyze. ESP32 sends garbage over Serial due to baud rate mismatch.",
+    "stem_pattern": "debugging",
+    "question": "An ESP32 reads encoder pulses and publishes wheel odometry over Serial to a Raspberry Pi running ROS 2. The Pi receives garbage characters instead of valid data. The wiring is correct. What is the most likely cause?",
     "options": [
       {
         "label": "A",
-        "text": "Validate the downloaded binary with a hash or signature check.",
+        "text": "The ESP32 is publishing at too high a frequency for rosserial to handle.",
         "is_correct": false,
-        "distractor_rationale": null
+        "distractor_rationale": "High publish frequency causes buffer overflows producing truncated messages, not random garbage characters from every byte."
       },
       {
         "label": "B",
-        "text": "Set the new partition as the boot partition and restart the device.",
-        "is_correct": false,
+        "text": "The baud rate on the ESP32 and the Pi's serial listener do not match.",
+        "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "Open the OTA partition for writing using esp_ota_begin().",
+        "text": "The ESP32 cannot publish odometry — it only supports sensor reads.",
         "is_correct": false,
-        "distractor_rationale": null
+        "distractor_rationale": "ESP32 can transmit any data structure over Serial; it is not restricted to read-only sensor operations."
       },
       {
         "label": "D",
-        "text": "Download the firmware binary from the OTA server in chunks.",
+        "text": "The Raspberry Pi's UART is disabled by default in raspi-config.",
         "is_correct": false,
-        "distractor_rationale": null
+        "distractor_rationale": "A disabled UART would produce no data at all, not garbled characters."
       }
     ],
-    "correct_order": [
-      "C",
-      "D",
-      "A",
-      "B"
+    "explanation": "Mismatched baud rates cause the receiver to sample bits at wrong intervals, producing garbled data. Publishing frequency affects buffer overflows, not character corruption. A disabled UART would produce no data at all.",
+    "source_excerpt": "Serial communication requires both transmitter and receiver to use the same baud rate. A mismatch causes bit sampling errors that produce garbled or garbage characters at the receiving end.",
+    "source_heading": "Embedded ROS > ESP32 Serial Communication > Baud Rate",
+    "bloom_level": "analyze",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q25 — Bloom: Analyze. Doubling encoder publish rate overflows Serial buffer.",
+    "stem_pattern": "scenario",
+    "question": "A developer doubles the encoder publishing frequency on an Arduino from 10 Hz to 20 Hz without changing the Serial baud rate. What is the consequence?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Odometry accuracy automatically doubles because position updates are published more frequently.",
+        "is_correct": false,
+        "distractor_rationale": "Higher frequency alone does not improve accuracy; encoder resolution, timing stability, and noise also factor in."
+      },
+      {
+        "label": "B",
+        "text": "The Serial link cannot transmit data fast enough, causing buffer overflow and malformed messages.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "ROS 2 automatically reduces the encoder publish rate to match the available bandwidth.",
+        "is_correct": false,
+        "distractor_rationale": "ROS 2 does not throttle or backpressure a hardware serial publisher; the Arduino firmware controls the rate independently."
+      },
+      {
+        "label": "D",
+        "text": "The odometry message type dynamically expands to store the additional encoder data.",
+        "is_correct": false,
+        "distractor_rationale": "ROS message types are fixed at compile time and do not resize dynamically based on publish frequency."
+      }
     ],
-    "explanation": "The OTA partition is opened first (C), then chunks are written as they are downloaded (D). Once the full image is received it must be validated (A) before setting the boot flag and restarting (B). Restarting before validation risks booting a corrupt image.",
-    "source_excerpt": "OTA procedure: open the update partition, write the incoming binary data, verify integrity, then set the boot partition before restarting.",
-    "source_heading": "Firmware Management > OTA Updates > Procedure",
+    "explanation": "Doubling the publish frequency doubles the serial data volume per second. If the baud rate is unchanged, the transmit buffer cannot drain fast enough, causing overflow that results in truncated or corrupted odometry messages on the Pi.",
+    "source_excerpt": "Serial throughput is bounded by baud rate. Increasing the publish frequency without increasing baud rate will eventually overflow the transmit buffer, corrupting outgoing messages.",
+    "source_heading": "Embedded ROS > Arduino Serial > Throughput and Buffering",
+    "bloom_level": "analyze",
+    "difficulty": "medium",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q26 — Bloom: Analyze. ESP32 node disappears after firmware update — micro-ROS version mismatch.",
+    "stem_pattern": "debugging",
+    "question": "A micro-ROS node on an ESP32 was working correctly. After a firmware update the ROS 2 node list no longer shows the ESP32 node, but the Serial connection is active and the agent is running. What is the most likely cause?",
+    "options": [
+      {
+        "label": "A",
+        "text": "The micro-ROS agent version is incompatible with the updated firmware's micro-ROS library version.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "The ESP32 Serial baud rate changed after the firmware update.",
+        "is_correct": false,
+        "distractor_rationale": "A baud rate change would produce garbled data visible as Serial noise, not a silent missing node with an active connection."
+      },
+      {
+        "label": "C",
+        "text": "The Raspberry Pi's ROS 2 domain ID changed after reboot.",
+        "is_correct": false,
+        "distractor_rationale": "A domain ID mismatch would hide all ROS 2 nodes from the Pi, not just the ESP32 node specifically."
+      },
+      {
+        "label": "D",
+        "text": "The updated firmware publishes on a different topic name.",
+        "is_correct": false,
+        "distractor_rationale": "A topic name change would still show the node in ros2 node list — only the topic would differ, not the node visibility."
+      }
+    ],
+    "explanation": "micro-ROS client and agent must use matching library versions. A version mismatch causes the session handshake to fail silently — the agent runs and the Serial link is active, but no node is registered in the ROS 2 graph.",
+    "source_excerpt": "The micro-ROS client library embedded in firmware and the micro-ROS agent on the host must match versions. A mismatch causes the session establishment to fail, and the node will not appear in the ROS 2 graph.",
+    "source_heading": "Embedded ROS > micro-ROS > Agent/Client Version Compatibility",
+    "bloom_level": "analyze",
+    "difficulty": "hard",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q27 — Bloom: Apply. Correct sequence to publish IMU data from ESP32 via micro-ROS.",
+    "stem_pattern": "procedure",
+    "question": "A developer wants to read IMU data from a sensor over I2C on an ESP32 and publish it as a ROS 2 topic via micro-ROS. The 5 steps are listed out of order:\n\n1. Start the micro-ROS agent on the Raspberry Pi and verify the ESP32 node appears\n2. Write firmware that reads I2C sensor registers and populates a sensor_msgs/Imu struct\n3. Flash the firmware to the ESP32 and connect it to the Raspberry Pi over Serial\n4. Initialise the micro-ROS publisher and executor in the ESP32 firmware\n5. Verify IMU data by echoing the ROS 2 topic on the Raspberry Pi\n\nWhich sequence is correct?",
+    "options": [
+      {
+        "label": "A",
+        "text": "2 → 4 → 3 → 1 → 5",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "B",
+        "text": "4 → 2 → 3 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Initialises the publisher (4) before the sensor read logic (2) exists — the Imu struct has no data source to populate."
+      },
+      {
+        "label": "C",
+        "text": "2 → 3 → 4 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Flashes the firmware (3) before adding the micro-ROS publisher and executor (4) — flashed firmware is incomplete."
+      },
+      {
+        "label": "D",
+        "text": "4 → 3 → 2 → 1 → 5",
+        "is_correct": false,
+        "distractor_rationale": "Flashes the firmware (3) before either the sensor logic or publisher is written — nothing useful is on the device."
+      }
+    ],
+    "explanation": "Write the sensor read logic first (2), initialise the micro-ROS publisher and executor within the same firmware (4), flash and connect to the Pi (3), start the agent and confirm node discovery (1), then echo the topic to verify data (5).",
+    "source_excerpt": "micro-ROS firmware development follows: write sensor and application logic, initialise micro-ROS publisher and executor, flash to device, start agent on host, verify ROS 2 topic output.",
+    "source_heading": "Embedded ROS > micro-ROS > ESP32 Development Workflow",
     "bloom_level": "apply",
     "difficulty": "medium",
     "question_type": "ordering",
-    "stem_pattern": "procedure"
+    "ordering_statements": [
+      "Write firmware that reads I2C sensor registers and populates a sensor_msgs/Imu struct",
+      "Initialise the micro-ROS publisher and executor in the ESP32 firmware",
+      "Flash the firmware to the ESP32 and connect it to the Raspberry Pi over Serial",
+      "Start the micro-ROS agent on the Raspberry Pi and verify the ESP32 node appears",
+      "Verify IMU data by echoing the ROS 2 topic on the Raspberry Pi"
+    ]
   },
   {
-    "_comment": "ORDERING-3 | apply | ordering | procedure | I2C read transaction",
-    "question": "Arrange the following steps in the correct order for reading a register value from an I2C sensor.",
+    "_comment": "Q28 — Bloom: Understand. Left wheel faster causes robot to turn right.",
+    "stem_pattern": "scenario",
+    "question": "A differential drive robot's left wheel moves faster than its right wheel. Which way does the robot turn?",
     "options": [
       {
         "label": "A",
-        "text": "Send a repeated START and the sensor address with the READ bit set.",
+        "text": "Left",
         "is_correct": false,
-        "distractor_rationale": null
+        "distractor_rationale": "The robot turns toward the slower wheel — if the left wheel is faster, the nose is pushed toward the right."
       },
       {
         "label": "B",
-        "text": "Send the sensor address with the WRITE bit set.",
-        "is_correct": false,
+        "text": "Right",
+        "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "C",
-        "text": "Read the data byte and send NACK followed by STOP.",
+        "text": "Straight, because the speed difference only affects linear velocity.",
         "is_correct": false,
-        "distractor_rationale": null
+        "distractor_rationale": "The opposite is true — speed difference between wheels drives angular velocity (turning), while their sum drives linear velocity."
       },
       {
         "label": "D",
-        "text": "Write the register address byte to specify which register to read.",
+        "text": "The robot stops and rotates in place.",
         "is_correct": false,
-        "distractor_rationale": null
+        "distractor_rationale": "In-place rotation requires wheels to spin at equal speeds in opposite directions, not just different speeds."
       }
     ],
-    "correct_order": [
-      "B",
-      "D",
-      "A",
-      "C"
+    "explanation": "When the left wheel moves faster, it covers more ground on the left side, pushing the robot's nose toward the right. The robot always turns in the direction of the slower wheel.",
+    "source_excerpt": "In a differential drive robot, angular motion is produced by a speed difference between the two wheels. The robot turns toward the side of the slower wheel.",
+    "source_heading": "Kinematics > Differential Drive > Turning Behaviour",
+    "bloom_level": "understand",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q29 — Bloom: Remember. Role of the global costmap in Nav2.",
+    "stem_pattern": "definition",
+    "question": "In Nav2, what is the role of the global costmap?",
+    "options": [
+      {
+        "label": "A",
+        "text": "Controls the robot's maximum speed during navigation.",
+        "is_correct": false,
+        "distractor_rationale": "Speed limits are set in the local planner velocity parameters, not in the costmap."
+      },
+      {
+        "label": "B",
+        "text": "Represents the full environment for long-range path planning.",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "Tracks dynamic obstacles immediately around the robot.",
+        "is_correct": false,
+        "distractor_rationale": "This describes the local costmap, which covers a small rolling window around the robot and is updated frequently."
+      },
+      {
+        "label": "D",
+        "text": "Publishes the robot's localisation estimate.",
+        "is_correct": false,
+        "distractor_rationale": "Localisation is handled by AMCL or SLAM Toolbox, not by the costmap."
+      }
     ],
-    "explanation": "An I2C register read begins by writing the target register address (B then D), then uses a repeated START to switch direction (A) before clocking in the data (C). Sending a STOP before the repeated START would end the transaction prematurely.",
-    "source_excerpt": "A standard I2C register read: address + WRITE, register byte, repeated START, address + READ, data byte, NACK, STOP.",
-    "source_heading": "Communication Protocols > I2C > Read Transactions",
+    "explanation": "The global costmap represents the entire known environment, built from the static map. The global planner uses it to compute a full path from the robot's current position to the goal.",
+    "source_excerpt": "The global costmap in Nav2 is a static representation of the full environment used by the global planner to compute complete paths. It is typically built from a pre-existing occupancy grid map.",
+    "source_heading": "Nav2 > Costmap 2D > Global Costmap",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Q30 — Bloom: Remember. Command to list active topics in ROS 2.",
+    "stem_pattern": "definition",
+    "question": "Which command lists all active topics currently registered in a ROS 2 system?",
+    "options": [
+      {
+        "label": "A",
+        "text": "ros2 node list",
+        "is_correct": false,
+        "distractor_rationale": "ros2 node list lists active nodes, not topics."
+      },
+      {
+        "label": "B",
+        "text": "ros2 topic list",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "ros2 topic echo",
+        "is_correct": false,
+        "distractor_rationale": "ros2 topic echo subscribes to a specific named topic and prints its messages; it does not list topics."
+      },
+      {
+        "label": "D",
+        "text": "ros2 param list",
+        "is_correct": false,
+        "distractor_rationale": "ros2 param list lists parameters for a given node, not topics."
+      }
+    ],
+    "explanation": "ros2 topic list queries the ROS 2 graph and returns all topics currently registered, whether or not they have active publishers or subscribers.",
+    "source_excerpt": "The ros2 topic list command queries the DDS discovery layer and returns all topics currently registered in the ROS 2 graph.",
+    "source_heading": "ROS 2 Fundamentals > CLI Tools > ros2 topic",
+    "bloom_level": "remember",
+    "difficulty": "easy",
+    "question_type": "single_correct"
+  },
+  {
+    "_comment": "Code-Q1a — Bloom: Apply. Heartbeat node: correct parameter read and timer creation.",
+    "stem_pattern": "debugging",
+    "question": "A developer is completing the heartbeat publisher node below. The parameter 'publish_rate' has already been declared with a default of 1.0 Hz.\n\n```python\nclass HeartbeatNode(Node):\n    def __init__(self):\n        super().__init__('heartbeat_node')\n        self.declare_parameter('publish_rate', 1.0)\n        self.publisher_ = self.create_publisher(String, '/robot/heartbeat', 10)\n        # TODO 1: Read parameter and create timer\n        pass\n```\n\nWhich implementation of TODO 1 correctly reads the parameter and creates the timer?",
+    "options": [
+      {
+        "label": "A",
+        "text": "rate = self.get_parameter('publish_rate').value\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": false,
+        "distractor_rationale": "get_parameter().value returns a ParameterValue object, not a float. The correct call chains .get_parameter_value().double_value."
+      },
+      {
+        "label": "B",
+        "text": "rate = self.get_parameter('publish_rate').get_parameter_value().double_value\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": true,
+        "distractor_rationale": null
+      },
+      {
+        "label": "C",
+        "text": "rate = self.declare_parameter('publish_rate', 1.0)\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": false,
+        "distractor_rationale": "declare_parameter() registers a parameter and returns a Parameter object, not the float value. The parameter has already been declared, so calling it again would raise a ParameterAlreadyDeclaredException."
+      },
+      {
+        "label": "D",
+        "text": "rate = self.parameters['publish_rate']\nperiod = 1.0 / rate\nself.seq_count = 0\nself.create_timer(period, self.publish_heartbeat)",
+        "is_correct": false,
+        "distractor_rationale": "self.parameters is not a valid dict-style accessor in rclpy. Parameters must be retrieved via self.get_parameter()."
+      }
+    ],
+    "explanation": "The correct accessor chain is get_parameter('name').get_parameter_value().double_value. Using .value directly returns a ParameterValue wrapper object, and self.parameters[] is not a valid rclpy API. declare_parameter() registers a parameter — calling it again raises an exception.",
+    "source_excerpt": "In rclpy, reading a float parameter requires: self.get_parameter('name').get_parameter_value().double_value",
+    "source_heading": "ROS 2 Parameters > rclpy API > get_parameter",
     "bloom_level": "apply",
     "difficulty": "medium",
-    "question_type": "ordering",
-    "stem_pattern": "procedure"
+    "question_type": "code_mcq",
+    "code_language": "python"
   },
   {
-    "_comment": "ORDERING-4 | analyze | ordering | procedure | deep sleep entry sequence",
-    "question": "A developer wants to enter deep sleep correctly on an ESP32-S3. Arrange the following steps in the correct order.",
+    "_comment": "Code-Q1b — Bloom: Apply. Heartbeat node: correct message format in publish callback.",
+    "stem_pattern": "debugging",
+    "question": "A developer completes the publish_heartbeat callback for the heartbeat node. self.seq_count is initialized to 0 in __init__.\n\n```python\ndef publish_heartbeat(self):\n    # TODO 2: Build message and publish\n    pass\n```\n\nThe monitoring dashboard asserts the data field must exactly match:\n```\nHEARTBEAT | seq=<count> | node=heartbeat_node\n```\n\nWhich implementation is correct?",
     "options": [
       {
         "label": "A",
-        "text": "Call esp_deep_sleep_start().",
-        "is_correct": false,
-        "distractor_rationale": null
-      },
-      {
-        "label": "B",
-        "text": "Flush and close any open NVS handles.",
-        "is_correct": false,
-        "distractor_rationale": null
-      },
-      {
-        "label": "C",
-        "text": "Call esp_sleep_enable_timer_wakeup() with the desired sleep duration.",
-        "is_correct": false,
-        "distractor_rationale": null
-      },
-      {
-        "label": "D",
-        "text": "Call esp_wifi_stop() and esp_wifi_deinit() to shut down the radio.",
-        "is_correct": false,
-        "distractor_rationale": null
-      }
-    ],
-    "correct_order": [
-      "B",
-      "D",
-      "C",
-      "A"
-    ],
-    "explanation": "NVS handles must be closed before sleep to prevent data corruption (B). The Wi-Fi driver must be stopped to avoid elevated sleep current (D). The wakeup source is configured next (C). Only then is deep sleep entered (A). Entering sleep with the radio active is the most common cause of excessive current draw.",
-    "source_excerpt": "Before entering deep sleep: commit and close NVS, stop Wi-Fi, configure wakeup sources, then call esp_deep_sleep_start().",
-    "source_heading": "Power Management > Deep Sleep > Correct Entry Sequence",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "ordering",
-    "stem_pattern": "procedure"
-  },
-  {
-    "_comment": "CODE-1 | apply | single_correct | code-reading | interrupt handler anti-pattern",
-    "question": "A developer writes the following interrupt service routine for a button press:\n\nvoid IRAM_ATTR buttonISR(void *arg) {\n    vTaskDelay(pdMS_TO_TICKS(50));  // debounce\n    gpio_set_level(LED_PIN, 1);\n    ESP_LOGI(TAG, \"Button pressed\");\n}\n\nThis code compiles and runs, but the system crashes intermittently. What is the root cause?",
-    "options": [
-      {
-        "label": "A",
-        "text": "gpio_set_level() cannot be called from an ISR because it is not IRAM-resident.",
-        "is_correct": false,
-        "distractor_rationale": "gpio_set_level() is IRAM-safe on ESP32-S3; this is not the issue."
-      },
-      {
-        "label": "B",
-        "text": "vTaskDelay() and ESP_LOGI() must not be called from an ISR; they block or use resources unavailable in interrupt context.",
+        "text": "msg = String()\nmsg.data = f'HEARTBEAT | seq={self.seq_count} | node=heartbeat_node'\nself.publisher_.publish(msg)\nself.seq_count += 1",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
-        "label": "C",
-        "text": "The IRAM_ATTR attribute prevents the function from accessing GPIO peripherals.",
+        "label": "B",
+        "text": "msg = String()\nmsg.data = f'HEARTBEAT | seq={self.seq_count} | node=heartbeat_node'\nself.seq_count += 1\nself.publisher_.publish(msg)",
         "is_correct": false,
-        "distractor_rationale": "IRAM_ATTR places the function in IRAM for fast execution; it does not restrict peripheral access."
+        "distractor_rationale": "Increments the counter before publishing. The message is published with the correct count but the post-increment order matches the spec — however the spec says 'Increment the counter after publishing', so this order violates TR-4 as written."
+      },
+      {
+        "label": "C",
+        "text": "msg.data = f'HEARTBEAT | seq={self.seq_count} | node=heartbeat_node'\nself.publisher_.publish(msg)\nself.seq_count += 1",
+        "is_correct": false,
+        "distractor_rationale": "Attempts to set msg.data before instantiating the String() object — this raises an AttributeError since msg is not yet defined."
       },
       {
         "label": "D",
-        "text": "The interrupt fires too rapidly for the LED to respond, causing a race condition.",
+        "text": "msg = String()\nmsg.data = 'HEARTBEAT | seq=' + self.seq_count + ' | node=heartbeat_node'\nself.publisher_.publish(msg)\nself.seq_count += 1",
         "is_correct": false,
-        "distractor_rationale": "The crash is not timing-related; it is caused by illegal API calls within the ISR."
+        "distractor_rationale": "Attempts to concatenate an integer (self.seq_count) with strings using +, which raises a TypeError in Python. str(self.seq_count) or an f-string is required."
       }
     ],
-    "explanation": "ISRs execute with the scheduler suspended. vTaskDelay() attempts to yield \u2014 illegal in an ISR \u2014 and ESP_LOGI() uses a non-IRAM-safe logging backend. Both will corrupt the FreeRTOS state. The correct pattern is to use a semaphore or task notification from the ISR and handle debounce and logging in a normal task.",
-    "source_excerpt": "ISRs must never call FreeRTOS API functions that are not ISR-safe. vTaskDelay(), xQueueSend(), and logging functions must be replaced with their FromISR variants or avoided entirely.",
-    "source_heading": "Microcontroller Programming > Interrupts > ISR Constraints",
+    "explanation": "The correct implementation instantiates String(), formats the data field using an f-string with the current counter value, publishes, then increments. Option D fails with TypeError when concatenating int and str. Option C raises AttributeError as msg is undefined. Option B increments before publishing, violating the spec order.",
+    "source_excerpt": "std_msgs/String messages must be instantiated before setting the .data field. Python f-strings are the idiomatic way to embed integer counters in message strings.",
+    "source_heading": "ROS 2 Fundamentals > Publishing Messages > std_msgs/String",
     "bloom_level": "apply",
     "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
+    "question_type": "code_mcq",
+    "code_language": "python"
   },
   {
-    "_comment": "CODE-2 | analyze | single_correct | code-reading | NVS write without commit",
-    "question": "Review the following NVS write sequence:\n\nnvs_handle_t h;\nnvs_open(\"storage\", NVS_READWRITE, &h);\nnvs_set_u32(h, \"boot_count\", count);\nnvs_close(h);\n\nAfter a power cycle, the value of boot_count is always 0. What is missing?",
+    "_comment": "Code-Q2a — Bloom: Apply. ObstacleStopper: correct subscriber and parameter setup in __init__.",
+    "stem_pattern": "debugging",
+    "question": "A developer is completing the ObstacleStopper node. The stop_distance parameter has already been declared.\n\n```python\ndef __init__(self):\n    super().__init__('obstacle_stopper')\n    self.declare_parameter('stop_distance', 0.5)\n    self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)\n    # TODO 1:\n    # a) Read stop_distance and store as self.stop_dist\n    # b) Subscribe to /scan; callback: self.scan_callback\n    pass\n```\n\nWhich implementation of TODO 1 is correct?",
     "options": [
       {
         "label": "A",
-        "text": "nvs_flash_init() was not called before nvs_open().",
-        "is_correct": false,
-        "distractor_rationale": "A missing nvs_flash_init() would cause nvs_open() to return an error, not a silent write failure."
-      },
-      {
-        "label": "B",
-        "text": "nvs_commit(h) was not called before nvs_close(), so the value was never persisted to flash.",
+        "text": "self.stop_dist = self.get_parameter('stop_distance').get_parameter_value().double_value\nself.create_subscription(LaserScan, '/scan', self.scan_callback, 10)",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
-        "label": "C",
-        "text": "The namespace 'storage' does not exist; it must be created with nvs_create_namespace() first.",
-        "is_correct": false,
-        "distractor_rationale": "NVS namespaces are created implicitly on first use; no separate creation call is required."
-      },
-      {
-        "label": "D",
-        "text": "NVS cannot store uint32 values; nvs_set_blob() should be used instead.",
-        "is_correct": false,
-        "distractor_rationale": "nvs_set_u32() is a valid NVS API function for 32-bit unsigned integers."
-      }
-    ],
-    "explanation": "NVS writes are buffered in RAM until nvs_commit() is called. Without the commit, the data exists only in the cache and is lost on power loss or reset.",
-    "source_excerpt": "After writing values to NVS, call nvs_commit() to flush the data to flash. Without this call, changes are lost on power cycle.",
-    "source_heading": "Storage > NVS > Write and Commit",
-    "bloom_level": "analyze",
-    "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
-  },
-  {
-    "_comment": "CODE-3 | apply | single_correct | code-reading | mutex usage",
-    "question": "Two FreeRTOS tasks share a global buffer. The developer protects it with the following code:\n\nSemaphoreHandle_t mutex = xSemaphoreCreateMutex();\n\n// In taskA:\nxSemaphoreTake(mutex, portMAX_DELAY);\nmemcpy(buffer, data, len);\nxSemaphoreGive(mutex);\n\n// In taskB:\nmemcpy(output, buffer, len);  // no mutex\n\nWhat problem does this code have?",
-    "options": [
-      {
-        "label": "A",
-        "text": "xSemaphoreCreateMutex() cannot be used to protect memory buffers; xSemaphoreCreateBinary() must be used instead.",
-        "is_correct": false,
-        "distractor_rationale": "A mutex is exactly the correct primitive for mutual exclusion over shared resources."
-      },
-      {
         "label": "B",
-        "text": "taskB reads the buffer without acquiring the mutex, creating an unprotected concurrent access.",
-        "is_correct": true,
-        "distractor_rationale": null
+        "text": "self.stop_dist = self.get_parameter('stop_distance')\nself.scan_sub = self.create_subscription('/scan', LaserScan, self.scan_callback, 10)",
+        "is_correct": false,
+        "distractor_rationale": "get_parameter() returns a Parameter object, not a float. Additionally, create_subscription() requires the message type as the first positional argument, not the topic string."
       },
       {
         "label": "C",
-        "text": "portMAX_DELAY causes taskA to block indefinitely and prevents taskB from ever running.",
+        "text": "self.stop_dist = float(self.get_parameter('stop_distance'))\nself.create_subscription(LaserScan, '/scan', self.scan_callback, 10)",
         "is_correct": false,
-        "distractor_rationale": "portMAX_DELAY means wait forever for the mutex to become available \u2014 it does not block other tasks once the mutex is held and then released."
+        "distractor_rationale": "float() on a Parameter object does not extract the numeric value — it would raise a TypeError. The correct chain is .get_parameter_value().double_value."
       },
       {
         "label": "D",
-        "text": "memcpy() is not thread-safe and cannot be used inside a critical section.",
+        "text": "self.stop_dist = 0.5\nself.create_subscription(LaserScan, '/scan', self.scan_callback, 10)",
         "is_correct": false,
-        "distractor_rationale": "memcpy() has no internal synchronisation requirements; it is safe to use inside a mutex-protected section."
+        "distractor_rationale": "Hardcoding the default value ignores the runtime parameter entirely. TR-2 explicitly requires reading stop_distance via get_parameter()."
       }
     ],
-    "explanation": "Mutual exclusion only works if all accesses to the shared resource go through the same lock. taskB bypasses the mutex entirely, so taskA's protection is ineffective \u2014 a race condition remains.",
-    "source_excerpt": "All tasks that access a shared resource must acquire the same mutex before reading or writing. Protecting writes but not reads leaves the resource vulnerable to race conditions.",
-    "source_heading": "RTOS Fundamentals > FreeRTOS > Mutexes and Shared Resources",
+    "explanation": "The correct implementation reads the float parameter via .get_parameter_value().double_value and creates the subscription with the message type as the first argument. Option B swaps the argument order for create_subscription and fails to extract the float. Option C wraps a Parameter in float() which raises TypeError. Option D ignores the parameter entirely.",
+    "source_excerpt": "create_subscription(msg_type, topic, callback, qos) — message type is the first positional argument. Parameters must be read with .get_parameter_value().double_value for floats.",
+    "source_heading": "ROS 2 Fundamentals > Subscriptions > create_subscription API",
     "bloom_level": "apply",
     "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
+    "question_type": "code_mcq",
+    "code_language": "python"
   },
   {
-    "_comment": "CODE-4 | analyze | single_correct | code-reading | heap allocation in task",
-    "question": "A FreeRTOS task allocates memory on every iteration:\n\nvoid sensorTask(void *arg) {\n    while (1) {\n        float *buf = malloc(128 * sizeof(float));\n        readSensor(buf);\n        publishData(buf);\n        vTaskDelay(pdMS_TO_TICKS(1000));\n    }\n}\n\nAfter 6 hours the device crashes with 'out of memory'. What is the cause and the correct fix?",
+    "_comment": "Code-Q2b — Bloom: Analyze. ObstacleStopper scan callback: correct inf/nan filtering and Twist logic.",
+    "stem_pattern": "debugging",
+    "question": "A developer writes the scan_callback for the ObstacleStopper node. TR-5 requires that inf and nan values in msg.ranges are filtered before computing the minimum.\n\n```python\ndef scan_callback(self, msg):\n    # TODO 2\n    pass\n```\n\nWhich implementation correctly satisfies all requirements?",
     "options": [
       {
         "label": "A",
-        "text": "The buffer is too large for the heap; reduce it to 32 floats.",
-        "is_correct": false,
-        "distractor_rationale": "512 bytes is well within ESP32-S3's heap; size is not the issue."
-      },
-      {
-        "label": "B",
-        "text": "malloc() is not thread-safe in FreeRTOS and corrupts the heap; use pvPortMalloc() instead.",
-        "is_correct": false,
-        "distractor_rationale": "ESP-IDF's malloc() is backed by pvPortMalloc() and is thread-safe; this is not the cause."
-      },
-      {
-        "label": "C",
-        "text": "The buffer is never freed after use; heap exhaustion occurs gradually as unreleased memory accumulates.",
+        "text": "valid = [r for r in msg.ranges if not math.isnan(r) and not math.isinf(r)]\ntwist = Twist()\nif len(valid) == 0 or min(valid) >= self.stop_dist:\n    twist.linear.x = 0.2\nelse:\n    twist.linear.x = 0.0\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
-        "label": "D",
-        "text": "vTaskDelay() resets the heap allocator state and invalidates the pointer on each iteration.",
+        "label": "B",
+        "text": "min_range = min(msg.ranges)\ntwist = Twist()\nif min_range < self.stop_dist:\n    twist.linear.x = 0.0\nelse:\n    twist.linear.x = 0.2\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
         "is_correct": false,
-        "distractor_rationale": "vTaskDelay() yields the CPU; it has no effect on heap state or pointer validity."
+        "distractor_rationale": "Does not filter inf/nan values. If msg.ranges contains inf or nan, min() will return nan, causing incorrect comparisons (nan < x is always False in Python)."
+      },
+      {
+        "label": "C",
+        "text": "valid = [r for r in msg.ranges if r > 0]\ntwist = Twist()\nif min(valid) < self.stop_dist:\n    twist.linear.x = 0.0\nelse:\n    twist.linear.x = 0.2\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
+        "is_correct": false,
+        "distractor_rationale": "Filtering r > 0 does not exclude nan or inf values (inf > 0 is True and nan > 0 evaluates to False but for the wrong reason). This does not reliably satisfy TR-5."
+      },
+      {
+        "label": "D",
+        "text": "valid = [r for r in msg.ranges if not math.isnan(r) and not math.isinf(r)]\ntwist = Twist()\nif min(valid) < self.stop_dist:\n    twist.linear.x = 0.0\nelse:\n    twist.linear.x = 0.2\ntwist.angular.z = 0.0\nself.cmd_pub.publish(twist)",
+        "is_correct": false,
+        "distractor_rationale": "Correct filtering, but does not handle the edge case where valid is empty (all ranges were inf/nan). Calling min([]) raises ValueError."
       }
     ],
-    "explanation": "Every malloc() must be paired with a free(). Without free(buf) after publishData(), 512 bytes of heap are leaked on every iteration. After 6 hours (21,600 iterations) nearly 10 MB of heap has been leaked \u2014 far exceeding the available RAM.",
-    "source_excerpt": "Every heap allocation with malloc() or pvPortMalloc() must be explicitly freed with free() when no longer needed. Failing to do so causes heap exhaustion over time.",
-    "source_heading": "Memory Management > Heap Allocation",
+    "explanation": "Option A is the only implementation that: (1) correctly filters using math.isnan and math.isinf, (2) handles the empty-list edge case with len(valid) == 0, and (3) applies the correct stop/move logic. Option B skips filtering. Option C's filter is unreliable for nan/inf. Option D crashes on an empty valid list.",
+    "source_excerpt": "LaserScan.ranges may contain float('inf') for out-of-range readings and float('nan') for invalid returns. Use math.isnan() and math.isinf() to filter them before aggregation.",
+    "source_heading": "ROS 2 Sensors > LaserScan > Handling Invalid Range Values",
     "bloom_level": "analyze",
     "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
+    "question_type": "code_mcq",
+    "code_language": "python"
   },
   {
-    "_comment": "CODE-5 | apply | single_correct | code-reading | ADC attenuation",
-    "question": "A developer reads a 0\u20133.3 V sensor on an ESP32-S3 ADC channel:\n\nadc1_config_width(ADC_WIDTH_BIT_12);\nadc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_0);\nint raw = adc1_get_raw(ADC1_CHANNEL_0);\n\nReadings saturate at approximately 1100 mV even when the sensor outputs 3.3 V. What is wrong?",
+    "_comment": "Code-Q3a — Bloom: Apply. WaypointNavigator: correct yaw-to-quaternion conversion in make_pose.",
+    "stem_pattern": "debugging",
+    "question": "A developer is implementing make_pose() for the WaypointNavigator node. TR-3 specifies the quaternion formula: qz = sin(yaw/2), qw = cos(yaw/2), qx = qy = 0.0.\n\n```python\ndef make_pose(self, x, y, yaw):\n    # TODO 2: Build and return a PoseStamped\n    pass\n```\n\nWhich implementation correctly constructs the PoseStamped with the right quaternion?",
     "options": [
       {
         "label": "A",
-        "text": "ADC_WIDTH_BIT_12 exceeds the ESP32-S3's maximum resolution of 10 bits.",
-        "is_correct": false,
-        "distractor_rationale": "The ESP32-S3 ADC supports up to 12-bit resolution; this is not the issue."
-      },
-      {
-        "label": "B",
-        "text": "ADC_ATTEN_DB_0 limits the measurable input range to approximately 0\u20131.1 V; ADC_ATTEN_DB_12 is needed to cover 0\u20133.3 V.",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'map'\npose.header.stamp = self.get_clock().now().to_msg()\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.position.z = 0.0\npose.pose.orientation.z = math.sin(yaw / 2)\npose.pose.orientation.w = math.cos(yaw / 2)\nreturn pose",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
-        "label": "C",
-        "text": "adc1_get_raw() returns a value in millivolts, not a raw ADC count, so the reading appears clamped.",
+        "label": "B",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'map'\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.orientation.z = math.sin(yaw)\npose.pose.orientation.w = math.cos(yaw)\nreturn pose",
         "is_correct": false,
-        "distractor_rationale": "adc1_get_raw() returns a raw digital count (0\u20134095), not millivolts."
+        "distractor_rationale": "Uses sin(yaw) and cos(yaw) instead of sin(yaw/2) and cos(yaw/2). This produces an incorrect quaternion that does not represent the intended rotation. Also omits the stamp."
+      },
+      {
+        "label": "C",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'map'\npose.header.stamp = self.get_clock().now().to_msg()\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.orientation.x = math.sin(yaw / 2)\npose.pose.orientation.w = math.cos(yaw / 2)\nreturn pose",
+        "is_correct": false,
+        "distractor_rationale": "Sets orientation.x instead of orientation.z for the sin(yaw/2) component. For a 2D rotation about the Z-axis, only qz and qw are non-zero."
       },
       {
         "label": "D",
-        "text": "GPIO0 cannot be used as ADC1_CHANNEL_0 on ESP32-S3; a different channel must be selected.",
+        "text": "pose = PoseStamped()\npose.header.frame_id = 'odom'\npose.header.stamp = self.get_clock().now().to_msg()\npose.pose.position.x = x\npose.pose.position.y = y\npose.pose.orientation.z = math.sin(yaw / 2)\npose.pose.orientation.w = math.cos(yaw / 2)\nreturn pose",
         "is_correct": false,
-        "distractor_rationale": "The question addresses attenuation configuration, not channel mapping; this is a distractor."
+        "distractor_rationale": "Sets frame_id to 'odom' instead of 'map'. Nav2 navigation goals must be given in the 'map' frame; an 'odom' frame goal will cause a TF lookup failure."
       }
     ],
-    "explanation": "ADC attenuation sets the full-scale input voltage. ADC_ATTEN_DB_0 has a full scale of ~1.1 V. To measure up to 3.3 V, ADC_ATTEN_DB_12 (full scale ~3.9 V) must be used.",
-    "source_excerpt": "ADC_ATTEN_DB_0 allows input voltages up to approximately 1.1 V. Use ADC_ATTEN_DB_12 to measure signals up to the GPIO voltage level of 3.3 V.",
-    "source_heading": "Microcontroller Peripherals > ADC > Attenuation",
+    "explanation": "For a 2D yaw rotation, the quaternion components are qx=0, qy=0, qz=sin(yaw/2), qw=cos(yaw/2). The frame_id must be 'map' for Nav2 goals. Option B uses wrong formula. Option C sets orientation.x instead of orientation.z. Option D uses the wrong frame.",
+    "source_excerpt": "Nav2 PoseStamped goals must use frame_id='map'. Yaw to quaternion conversion for 2D: qz=sin(yaw/2), qw=cos(yaw/2), qx=qy=0.",
+    "source_heading": "Nav2 > Simple Commander API > PoseStamped Goals",
     "bloom_level": "apply",
     "difficulty": "medium",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
+    "question_type": "code_mcq",
+    "code_language": "python"
   },
   {
-    "_comment": "CODE-6 | analyze | single_correct | code-reading | semaphore from ISR",
-    "question": "A developer uses the following pattern to signal a task from a GPIO interrupt:\n\nSemaphoreHandle_t sem;\n\nvoid IRAM_ATTR gpioISR(void *arg) {\n    xSemaphoreGive(sem);\n}\n\nvoid handlerTask(void *arg) {\n    while (1) {\n        xSemaphoreTake(sem, portMAX_DELAY);\n        processEvent();\n    }\n}\n\nThe application crashes occasionally. What should the developer change?",
+    "_comment": "Code-Q3b — Bloom: Analyze. WaypointNavigator: correct mission loop with failure handling.",
+    "stem_pattern": "debugging",
+    "question": "A developer implements run_mission() for the WaypointNavigator. The node must navigate to each waypoint in sequence and log 'Goal failed. Aborting.' if any single goal fails.\n\n```python\ndef run_mission(self):\n    # TODO 3: Loop over WAYPOINTS, send goals, check results\n    pass\n```\n\nWhich implementation correctly satisfies all requirements including failure handling?",
     "options": [
       {
         "label": "A",
-        "text": "Replace xSemaphoreGive() with xSemaphoreGiveFromISR() and add a portYIELD_FROM_ISR() call.",
+        "text": "for wp in WAYPOINTS:\n    goal = self.make_pose(wp['x'], wp['y'], wp['yaw'])\n    self.navigator.goToPose(goal)\n    while not self.navigator.isTaskComplete():\n        pass\n    result = self.navigator.getResult()\n    if result != TaskResult.SUCCEEDED:\n        self.get_logger().info('Goal failed. Aborting.')\n        return\nself.get_logger().info('All waypoints reached.')",
         "is_correct": true,
         "distractor_rationale": null
       },
       {
         "label": "B",
-        "text": "Replace xSemaphoreTake() with xSemaphoreTakeFromISR() in handlerTask.",
+        "text": "for wp in WAYPOINTS:\n    goal = self.make_pose(wp['x'], wp['y'], wp['yaw'])\n    self.navigator.goToPose(goal)\n    result = self.navigator.getResult()\n    if result != TaskResult.SUCCEEDED:\n        self.get_logger().info('Goal failed. Aborting.')\n        return\nself.get_logger().info('All waypoints reached.')",
         "is_correct": false,
-        "distractor_rationale": "handlerTask runs in normal task context; the FromISR variant is for use inside ISRs only."
+        "distractor_rationale": "Calls getResult() immediately after goToPose() without polling isTaskComplete(). goToPose() is non-blocking; getResult() called before completion returns an undefined or stale result."
       },
       {
         "label": "C",
-        "text": "Create the semaphore as a mutex rather than a binary semaphore to support ISR signalling.",
+        "text": "for wp in WAYPOINTS:\n    goal = self.make_pose(wp['x'], wp['y'], wp['yaw'])\n    self.navigator.goToPose(goal)\n    while not self.navigator.isTaskComplete():\n        pass\n    result = self.navigator.getResult()\nif result != TaskResult.SUCCEEDED:\n    self.get_logger().info('Goal failed. Aborting.')\n    return\nself.get_logger().info('All waypoints reached.')",
         "is_correct": false,
-        "distractor_rationale": "Mutexes must not be given from ISRs; binary semaphores are the correct primitive for ISR-to-task signalling."
+        "distractor_rationale": "The result check is outside the for loop — only the last waypoint's result is ever checked. A failure on WP-1 or WP-2 would be silently ignored and the robot would continue."
       },
       {
         "label": "D",
-        "text": "Move the processEvent() call directly into the ISR to avoid the need for a semaphore.",
+        "text": "goals = [self.make_pose(wp['x'], wp['y'], wp['yaw']) for wp in WAYPOINTS]\nself.navigator.followWaypoints(goals)\nwhile not self.navigator.isTaskComplete():\n    pass\nif self.navigator.getResult() != TaskResult.SUCCEEDED:\n    self.get_logger().info('Goal failed. Aborting.')\nelse:\n    self.get_logger().info('All waypoints reached.')",
         "is_correct": false,
-        "distractor_rationale": "ISRs should be as short as possible; blocking work like processEvent() must be deferred to a task."
+        "distractor_rationale": "Uses followWaypoints() which does not allow per-waypoint failure detection and early abort. The spec requires stopping immediately on the first failed goal, which followWaypoints() cannot provide."
       }
     ],
-    "explanation": "xSemaphoreGive() must not be called from an ISR \u2014 it may access non-IRAM memory or trigger a context switch incorrectly. xSemaphoreGiveFromISR() is the ISR-safe variant. portYIELD_FROM_ISR() ensures the unblocked task is scheduled promptly.",
-    "source_excerpt": "In ISR context, use xSemaphoreGiveFromISR() instead of xSemaphoreGive(), and pass the pxHigherPriorityTaskWoken parameter to portYIELD_FROM_ISR().",
-    "source_heading": "RTOS Fundamentals > FreeRTOS > ISR-Safe API",
+    "explanation": "The correct implementation polls isTaskComplete() before reading the result (goToPose is non-blocking), checks the result inside the loop so individual waypoint failures are caught, and returns immediately on failure. Option B skips polling. Option C checks result outside the loop. Option D uses followWaypoints() which prevents per-waypoint failure detection.",
+    "source_excerpt": "BasicNavigator.goToPose() is non-blocking. You must poll isTaskComplete() before calling getResult(). For per-waypoint failure handling, check the result inside the loop after each goal.",
+    "source_heading": "Nav2 > Simple Commander API > goToPose and getResult",
     "bloom_level": "analyze",
     "difficulty": "hard",
-    "question_type": "single_correct",
-    "stem_pattern": "debugging"
+    "question_type": "code_mcq",
+    "code_language": "python"
   }
 ]

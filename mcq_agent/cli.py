@@ -37,6 +37,109 @@ err_console = Console(stderr=True)
 log = structlog.get_logger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Interactive tag / course pickers
+# ---------------------------------------------------------------------------
+
+def _pick_from_list(items: list[str], noun: str, allow_new: bool = True) -> str:
+    """
+    Display a numbered list of existing *items* and return the user's pick.
+    If *allow_new* is True the user may also type a new name.
+    """
+    if items:
+        console.print(f"\n  Existing {noun}s:")
+        for i, item in enumerate(items, 1):
+            console.print(f"    [cyan]{i:>2}.[/cyan] {item}")
+    else:
+        console.print(f"\n  No {noun}s in database yet.")
+
+    if allow_new:
+        console.print(f"  [dim]Enter a number to select, or type a new {noun} name:[/dim]")
+    else:
+        console.print(f"  [dim]Enter a number to select:[/dim]")
+
+    while True:
+        raw = input("  > ").strip()
+        if not raw:
+            continue
+        if raw.isdigit():
+            idx = int(raw)
+            if 1 <= idx <= len(items):
+                return items[idx - 1]
+            console.print(f"  [red]Number {idx} out of range.[/red]")
+            continue
+        if allow_new:
+            normalised = raw.upper().replace(" ", "_")
+            return normalised
+        console.print("  [red]Please enter a valid number.[/red]")
+
+
+def _resolve_topic_tag(
+    flag_value: str | None,
+    db_path: Path,
+    json_events: bool,
+    settings_value: str | None,
+) -> str:
+    """
+    Return the topic tag to use for this run.
+
+    Priority: CLI flag → config.yaml → interactive prompt (human mode only).
+    In json-events (GUI) mode, falls back to 'UNTAGGED' without prompting.
+    """
+    if flag_value:
+        return flag_value.upper().replace(" ", "_")
+    if settings_value:
+        return settings_value
+    if json_events:
+        return "UNTAGGED"
+
+    console.print("\n[bold]Topic Tag[/bold]  (classifies what this document covers)")
+    tags = storage.list_topic_tags(db_path)
+    chosen = _pick_from_list(tags, "topic tag")
+
+    if chosen not in tags:
+        storage.add_topic_tag(chosen, db_path)
+        console.print(f"  [green]✓[/green] Added new topic tag: [cyan]{chosen}[/cyan]")
+    return chosen
+
+
+def _resolve_course(
+    flag_value: str | None,
+    db_path: Path,
+    json_events: bool,
+    settings_value: str,
+) -> str:
+    """
+    Return the course tag to use for this run.
+
+    Priority: CLI flag → config.yaml → interactive prompt (human mode only).
+    """
+    if flag_value:
+        return flag_value.upper().replace(" ", "_")
+    if settings_value and settings_value != "GRIT_ROBOTICS_L1_MAIN":
+        return settings_value
+
+    # In json-events mode just use whatever is in settings
+    if json_events:
+        return settings_value
+
+    console.print(f"\n[bold]Course[/bold]  (default: [cyan]{settings_value}[/cyan])")
+    courses = storage.list_courses(db_path)
+    if not courses:
+        console.print("  [dim]No courses in database yet. Press Enter to use the default.[/dim]")
+        raw = input(f"  > [{settings_value}] ").strip()
+        chosen = raw.upper().replace(" ", "_") if raw else settings_value
+    else:
+        console.print(f"  Press Enter to keep default ([cyan]{settings_value}[/cyan]).")
+        chosen_raw = _pick_from_list(courses, "course")
+        chosen = chosen_raw if chosen_raw else settings_value
+
+    if chosen and chosen not in courses:
+        storage.add_course(chosen, db_path)
+        console.print(f"  [green]✓[/green] Added new course: [cyan]{chosen}[/cyan]")
+    return chosen or settings_value
+
+
 def _build_client(settings: Settings) -> LLMClient:
     """Build a global client using the base provider/model."""
     api_key = load_dotenv_and_get_api_key(settings.provider)
@@ -46,6 +149,7 @@ def _build_client(settings: Settings) -> LLMClient:
         default_model=settings.model,
         max_retries=settings.api_max_retries,
         initial_backoff=settings.api_retry_initial_backoff,
+        use_headroom=settings.use_headroom,
     )
 
 
@@ -177,10 +281,35 @@ def generate(
     difficulty: Annotated[str | None, typer.Option("--difficulty", "-d")] = None,
     type: Annotated[str | None, typer.Option("--type", "-t")] = None,
     topic: Annotated[str | None, typer.Option(
-        "--topic", "-T",
+        "--topic",
         help="Human-readable lesson topic label stored in Supabase for filtering "
              "(e.g. 'MQTT Protocol'). Defaults to the filename stem in title case."
     )] = None,
+    topic_tag: Annotated[str | None, typer.Option(
+        "--topic-tag", "-T",
+        help="Topic tag applied to every question (e.g. LINUX_ROS2_FUNDAMENTALS). "
+             "If omitted you will be prompted interactively (or use UNTAGGED in GUI mode).",
+    )] = None,
+    run_name: Annotated[str | None, typer.Option(
+        "--run-name", "-n",
+        help="Human-readable name for this generation run (e.g. 'Week 2 Linux basics').",
+    )] = None,
+    subtopics: Annotated[str | None, typer.Option(
+        "--subtopics",
+        help="Comma-separated list of subtopic tags for this run "
+             "(e.g. 'MQTT_PROTOCOL,GPIO_BASICS,PWM_CONTROL'). "
+             "The generator assigns each question to the most appropriate subtopic.",
+    )] = None,
+    course: Annotated[str | None, typer.Option(
+        "--course", "-C",
+        help="Course tag (e.g. GRIT_ROBOTICS_L1_MAIN). Defaults to config.yaml value "
+             "or prompts interactively.",
+    )] = None,
+    no_public: Annotated[bool, typer.Option(
+        "--no-public",
+        help="Mark questions as private (omit IS_PUBLIC from the tag list). "
+             "Overrides the is_public setting in config.yaml.",
+    )] = False,
     config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     json_events: Annotated[bool, typer.Option(
@@ -226,8 +355,23 @@ def generate(
         db_path = Path(settings.log_db_path)
         storage.init_db(db_path)
 
+        # Resolve topic tag and course (interactive if not provided as flags)
+        resolved_topic_tag = _resolve_topic_tag(
+            topic_tag, db_path, json_events, settings.topic_tag
+        )
+        resolved_course = _resolve_course(
+            course, db_path, json_events, settings.course_tag
+        )
+
+        # Persist new topic tag / course to DB so they appear in future prompts
+        if resolved_topic_tag != "UNTAGGED":
+            storage.add_topic_tag(resolved_topic_tag, db_path)
+        if resolved_course:
+            storage.add_course(resolved_course, db_path)
+
         # Show stage routing (suppressed in JSON-events mode — stdout is NDJSON)
         if not json_events:
+            rn_label = run_name or "[dim](unnamed)[/dim]"
             console.print("\n[bold]MCQ Pipeline — Stage Configuration[/bold]")
             console.print(
                 f"  Analyzer  : [cyan]{settings.resolved_analyzer_provider().value}[/cyan] / "
@@ -244,9 +388,24 @@ def generate(
             )
             console.print(
                 f"  Input     : {input}\n"
+                f"  Run name  : {rn_label}\n"
+                f"  Topic tag : [cyan]{resolved_topic_tag}[/cyan]\n"
+                f"  Course    : [cyan]{resolved_course}[/cyan]\n"
                 f"  Topic     : [cyan]{topic}[/cyan]\n"
                 f"  Target    : [cyan]{mcq_config.num_questions}[/cyan] accepted questions\n"
             )
+
+        # Thread resolved tagging values into settings so pipeline picks them up.
+        # --no-public overrides the config.yaml is_public field for this run only.
+        settings = settings.model_copy(update={
+            "course_tag": resolved_course,
+            "is_public": not no_public and settings.is_public,
+        })
+
+        subtopic_list = (
+            [s.strip().upper().replace(" ", "_") for s in subtopics.split(",") if s.strip()]
+            if subtopics else []
+        )
 
         run = pipeline_mod.run_pipeline(
             input_file=input,
@@ -255,13 +414,17 @@ def generate(
             llm_client=client,
             output_dir=output_dir,
             topic=topic,
+            topic_tag=resolved_topic_tag,
+            run_name=run_name,
+            subtopics=subtopic_list or None,
         )
 
-        # Reconstruct label from run (same formula as pipeline)
-        run_number = storage.list_recent_runs(Path(settings.log_db_path), limit=1)
-        # Derive label from the output files already written
-        import re as _re
-        found = list(output_dir.glob(f"*_accepted.json"))
+        # Derive the run label from the most recently modified accepted file in
+        # output_dir — sorted by mtime so concurrent runs don't pick the wrong file.
+        found = sorted(
+            output_dir.glob("*_accepted.json"),
+            key=lambda p: p.stat().st_mtime,
+        )
         run_label = found[-1].stem.replace("_accepted", "") if found else run.run_id[:8]
 
         accepted_file  = output_dir / f"{run_label}_accepted.json"
@@ -302,6 +465,18 @@ def generate(
             f"  Salvaged   : [cyan]{run.salvaged_count}[/cyan]  (reframed from rejected)\n"
             f"  Rejected   : [yellow]{len(run.rejected_mcqs)}[/yellow]\n"
         )
+
+        # Tag summary
+        if run.final_mcqs:
+            from collections import Counter
+            bloom_dist = Counter(m.bloom_level.value for m in run.final_mcqs)
+            console.print(f"  Tags applied  : [cyan]{resolved_topic_tag}[/cyan]  ·  "
+                          f"[cyan]{resolved_course}[/cyan]  ·  IS_PUBLIC")
+            console.print("  Bloom levels  :")
+            for level, cnt in sorted(bloom_dist.items()):
+                bar = "█" * cnt
+                console.print(f"    [cyan]{level:<12}[/cyan] {cnt:>3}  {bar}")
+            console.print()
         console.print(
             f"  Cost breakdown:\n"
             f"    Analyzer  : [dim]${run.analyzer_cost_usd:.5f}[/dim]"
@@ -607,6 +782,205 @@ def push_supabase(
         else:
             err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
+
+@app.command(name="list-tags")
+def list_tags(
+    config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
+) -> None:
+    """List all topic tags stored in the database."""
+    try:
+        settings = load_config(config)
+        db_path = Path(settings.log_db_path)
+        storage.init_db(db_path)
+        tags = storage.list_topic_tags(db_path)
+        if not tags:
+            console.print("[yellow]No topic tags found.[/yellow]")
+            return
+        console.print("\n[bold]Topic Tags[/bold]")
+        for i, tag in enumerate(tags, 1):
+            console.print(f"  [cyan]{i:>2}.[/cyan] {tag}")
+    except Exception as exc:
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="list-courses")
+def list_courses_cmd(
+    config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
+) -> None:
+    """List all course names stored in the database."""
+    try:
+        settings = load_config(config)
+        db_path = Path(settings.log_db_path)
+        storage.init_db(db_path)
+        courses = storage.list_courses(db_path)
+        if not courses:
+            console.print("[yellow]No courses found.[/yellow]")
+            return
+        console.print("\n[bold]Courses[/bold]")
+        for i, name in enumerate(courses, 1):
+            console.print(f"  [cyan]{i:>2}.[/cyan] {name}")
+    except Exception as exc:
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="retag")
+def retag(
+    run_id: Annotated[str | None, typer.Option(
+        "--run-id", help="Retag a specific run by ID. Omit to retag all runs interactively."
+    )] = None,
+    topic_tag: Annotated[str | None, typer.Option("--topic-tag", "-T")] = None,
+    course: Annotated[str | None, typer.Option("--course", "-C")] = None,
+    run_name: Annotated[str | None, typer.Option("--run-name", "-n")] = None,
+    all_runs: Annotated[bool, typer.Option(
+        "--all", help="Retag ALL runs with the same topic-tag and course (non-interactive)."
+    )] = False,
+    config: Annotated[Path, typer.Option("--config")] = Path("config.yaml"),
+) -> None:
+    """
+    Backfill tags on existing questions in the database.
+
+    Without --all, walks each run interactively so you can assign different
+    topic tags per run.  With --all, applies a single topic-tag + course to
+    every run (requires --topic-tag and --course).
+    """
+    try:
+        settings = load_config(config)
+        db_path = Path(settings.log_db_path)
+        storage.init_db(db_path)
+
+        default_course = settings.course_tag
+
+        if all_runs:
+            # Non-interactive bulk retag
+            if not topic_tag or not course:
+                err_console.print(
+                    "[bold red]Error:[/bold red] --all requires both --topic-tag and --course."
+                )
+                raise typer.Exit(code=1)
+            resolved_tag = topic_tag.upper().replace(" ", "_")
+            resolved_course = course.upper().replace(" ", "_")
+            runs = storage.get_all_run_summaries(db_path)
+            total = 0
+            for r in runs:
+                n = storage.retag_run(
+                    r["run_id"], resolved_tag, resolved_course, db_path,
+                    is_public=settings.is_public,
+                    run_name=run_name,
+                )
+                console.print(
+                    f"  Run #{r['generation_number']:>3} ({r['run_id'][:8]}) "
+                    f"— {n} questions retagged → [cyan]{resolved_tag}[/cyan]"
+                )
+                total += n
+            console.print(f"\n[green]Done.[/green]  {total} questions retagged across {len(runs)} runs.")
+            return
+
+        # Interactive per-run retag
+        if run_id:
+            run_summaries = [r for r in storage.get_all_run_summaries(db_path) if r["run_id"] == run_id]
+            if not run_summaries:
+                err_console.print(f"[bold red]Run not found:[/bold red] {run_id}")
+                raise typer.Exit(code=1)
+        else:
+            run_summaries = storage.get_all_run_summaries(db_path)
+
+        if not run_summaries:
+            console.print("[yellow]No runs found in database.[/yellow]")
+            return
+
+        # Show run table
+        table = Table(title="Runs to Retag", show_lines=True)
+        table.add_column("#", style="cyan", no_wrap=True)
+        table.add_column("Gen", style="dim")
+        table.add_column("Input file")
+        table.add_column("Qs")
+        table.add_column("Current topic")
+        table.add_column("Current course")
+        table.add_column("Run name")
+        for i, r in enumerate(run_summaries, 1):
+            from pathlib import PurePosixPath
+            fname = PurePosixPath(r["input_file"]).name if r["input_file"] else "?"
+            table.add_row(
+                str(i),
+                str(r["generation_number"]),
+                fname,
+                str(r["passed_count"]),
+                r["topic_tag"] or "[dim]—[/dim]",
+                r["course_tag"] or "[dim]—[/dim]",
+                r["run_name"] or "[dim]—[/dim]",
+            )
+        console.print(table)
+
+        existing_tags = storage.list_topic_tags(db_path)
+        existing_courses = storage.list_courses(db_path)
+        total_updated = 0
+
+        for i, r in enumerate(run_summaries, 1):
+            from pathlib import PurePosixPath
+            fname = PurePosixPath(r["input_file"]).name if r["input_file"] else "?"
+            console.print(
+                f"\n[bold]Run #{r['generation_number']}[/bold]  "
+                f"({r['run_id'][:8]})  ·  {fname}  ·  {r['passed_count']} questions"
+            )
+
+            # Topic tag for this run
+            if topic_tag:
+                chosen_tag = topic_tag.upper().replace(" ", "_")
+            else:
+                console.print("[bold]  Topic tag:[/bold]")
+                chosen_tag = _pick_from_list(existing_tags, "topic tag")
+                if chosen_tag not in existing_tags:
+                    storage.add_topic_tag(chosen_tag, db_path)
+                    existing_tags.append(chosen_tag)
+                    existing_tags.sort()
+                    console.print(f"  [green]✓[/green] Added: [cyan]{chosen_tag}[/cyan]")
+
+            # Course for this run
+            if course:
+                chosen_course = course.upper().replace(" ", "_")
+            else:
+                console.print(f"[bold]  Course[/bold]  (default: [cyan]{default_course}[/cyan]):")
+                raw = input(f"  Enter number / name [Enter={default_course}]: ").strip()
+                if not raw:
+                    chosen_course = default_course
+                elif raw.isdigit() and 1 <= int(raw) <= len(existing_courses):
+                    chosen_course = existing_courses[int(raw) - 1]
+                else:
+                    chosen_course = raw.upper().replace(" ", "_")
+                if chosen_course not in existing_courses:
+                    storage.add_course(chosen_course, db_path)
+                    existing_courses.append(chosen_course)
+                    existing_courses.sort()
+
+            # Run name
+            if run_name:
+                chosen_name: str | None = run_name
+            else:
+                current = r["run_name"] or ""
+                raw_name = input(f"  Run name [Enter to keep '{current}']: ").strip()
+                chosen_name = raw_name if raw_name else (current or None)
+
+            n = storage.retag_run(
+                r["run_id"], chosen_tag, chosen_course, db_path,
+                is_public=settings.is_public,
+                run_name=chosen_name,
+            )
+            console.print(
+                f"  [green]✓[/green]  {n} questions retagged → "
+                f"[cyan]{chosen_tag}[/cyan] / [cyan]{chosen_course}[/cyan]"
+            )
+            total_updated += n
+
+        console.print(f"\n[green]Done.[/green]  {total_updated} questions updated.")
+
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
 
 if __name__ == "__main__":
     app()

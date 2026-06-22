@@ -19,8 +19,8 @@ const BLOOMS: BloomLevel[] = [
 ]
 const TYPES: { id: QuestionType; label: string }[] = [
   { id: 'single_correct', label: 'SC' },
+  { id: 'multiple_correct', label: 'Multi' },
   { id: 'ordering', label: 'Ordering' },
-  { id: 'code_snippet', label: 'Code' },
 ]
 const FETCH_MODES: { id: FetchMode; label: string; hint: string }[] = [
   { id: 'sequential', label: 'Sequential', hint: 'ordered by question number' },
