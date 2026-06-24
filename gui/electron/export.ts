@@ -506,9 +506,7 @@ export function buildPaperXlsx(rows: ExportRow[]): Buffer {
       r.explanation ?? '',
       key,
       String(r['sub_topic'] ?? ''),
-      r.difficulty
-        ? r.difficulty.charAt(0).toUpperCase() + r.difficulty.slice(1)
-        : '',
+      r.difficulty ? r.difficulty.toUpperCase() : '',
       visibility,
     ])
   })
