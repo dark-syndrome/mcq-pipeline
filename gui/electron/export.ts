@@ -152,7 +152,7 @@ export function buildHtml(rows: ExportRow[], o: ExportOptions): string {
         )
         .join('')
       const meta = o.metadata
-        ? `<p class="meta">${esc(r.difficulty)} · ${esc(r.bloom_level)} · ${esc(r.question_type)}${
+        ? `<p class="meta">${esc(r.difficulty.toUpperCase())} · ${esc(r.bloom_level)} · ${esc(r.question_type)}${
             r.source_heading ? ` · ${esc(r.source_heading)}` : ''
           }</p>`
         : ''
@@ -334,7 +334,7 @@ export async function buildDocx(
         new Paragraph({
           children: [
             new TextRun({
-              text: `${r.difficulty} · ${r.bloom_level} · ${r.question_type}${
+              text: `${r.difficulty.toUpperCase()} · ${r.bloom_level} · ${r.question_type}${
                 r.source_heading ? ` · ${r.source_heading}` : ''
               }`,
               italics: true,
@@ -417,7 +417,7 @@ export function buildXlsx(rows: ExportRow[], o: ExportOptions): Buffer {
     if (o.metadata !== false) {
       row.push(
         r.bloom_level,
-        r.difficulty,
+        r.difficulty.toUpperCase(),
         r.question_type,
         r.source_heading,
         r.question_number,
