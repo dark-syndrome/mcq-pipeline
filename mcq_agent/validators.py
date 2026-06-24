@@ -15,6 +15,7 @@ New in optimised build
 """
 
 import random
+import re
 import statistics
 
 from .config import Settings
@@ -58,9 +59,11 @@ def validate_uniqueness(
     Check that the number of correct options is consistent with *question_type*.
 
     - ``SINGLE_CORRECT``:   exactly one option must have ``is_correct=True``.
-    - ``MULTIPLE_CORRECT``: at least one but not all options may be correct.
-    - ``ORDERING``:         all options must have ``is_correct=False``;
-                            correct_order must be present and match option labels.
+    - ``MULTIPLE_CORRECT``: at least two but not all options must be correct.
+    - ``ORDERING``:         exactly one option (the correct sequence) is correct;
+                            ``ordering_statements`` must be present. Structural
+                            integrity of the sequences is checked separately by
+                            :func:`validate_ordering_structure`.
     """
     correct_count = sum(1 for opt in mcq.options if opt.is_correct)
     total = len(mcq.options)
@@ -86,10 +89,93 @@ def validate_uniqueness(
         )
 
     # MULTIPLE_CORRECT
-    if correct_count == 0:
-        return False, "MULTIPLE_CORRECT question has no correct options"
+    if correct_count < 2:
+        return (
+            False,
+            f"MULTIPLE_CORRECT question must have at least 2 correct options, "
+            f"found {correct_count}",
+        )
     if correct_count == total:
         return False, "MULTIPLE_CORRECT question has all options marked correct"
+    return True, None
+
+
+# ---------------------------------------------------------------------------
+# Ordering structural integrity
+# ---------------------------------------------------------------------------
+
+
+_SEQUENCE_TOKEN_RE = re.compile(r"\d+")
+
+
+def _parse_sequence(text: str) -> list[int] | None:
+    """
+    Extract the ordered list of step numbers from an ORDERING option.
+
+    Options look like ``"3 → 1 → 4 → 2"`` (the arrow may be →, ->, or any
+    separator). Returns the integers in the order they appear, or ``None`` if
+    the option contains no digits at all (i.e. it is not a sequence option).
+    """
+    nums = [int(m) for m in _SEQUENCE_TOKEN_RE.findall(text)]
+    return nums or None
+
+
+def validate_ordering_structure(mcq: MCQ) -> tuple[bool, str | None]:
+    """
+    Structural integrity checks for ORDERING questions.
+
+    This is the deterministic guarantee that an ORDERING question is actually
+    answerable once exported — the failure mode where the numbered steps are
+    missing and only bare sequences (``3 → 1 → 4 → 2``) survive.
+
+    Checks (non-ORDERING questions pass trivially):
+    - ``ordering_statements`` is present and every statement is non-trivial.
+    - Each option encodes a sequence that is a permutation of ``1..N`` where
+      ``N == len(ordering_statements)`` — no missing, extra, duplicate, or
+      out-of-range step numbers.
+    """
+    if mcq.question_type != QuestionType.ORDERING:
+        return True, None
+
+    statements = mcq.ordering_statements or []
+    if not statements:
+        return (
+            False,
+            "ORDERING question is missing ordering_statements (the numbered steps); "
+            "the exported question would be unanswerable",
+        )
+
+    blank = [i + 1 for i, s in enumerate(statements) if not (s or "").strip()]
+    if blank:
+        return (
+            False,
+            f"ordering_statements contains blank step(s) at position(s): {blank}",
+        )
+
+    n = len(statements)
+    expected = set(range(1, n + 1))
+
+    for opt in mcq.options:
+        seq = _parse_sequence(opt.text)
+        if not seq:
+            return (
+                False,
+                f"ORDERING option '{opt.label}' does not contain a step sequence "
+                f"(expected something like '1 → 2 → 3 → ...'): {opt.text!r}",
+            )
+        if len(seq) != n:
+            return (
+                False,
+                f"ORDERING option '{opt.label}' lists {len(seq)} steps but there "
+                f"are {n} ordering_statements; every option must order all steps",
+            )
+        if set(seq) != expected:
+            return (
+                False,
+                f"ORDERING option '{opt.label}' sequence {seq} is not a valid "
+                f"permutation of steps 1..{n} (duplicate or out-of-range step numbers)",
+            )
+
     return True, None
 
 
@@ -301,11 +387,12 @@ def run_all_validators(
     Validators run (in order):
     1. source_grounding        — excerpt fuzzy-matched against document
     2. uniqueness              — correct option count matches question_type
-    3. option_count            — matches configured num_options
-    4. distractor_rationales   — all distractors have rationale text
-    5. bloom_difficulty        — bloom level consistent with difficulty
-    6. length_parity           — correct answer not >30% longer than distractors
-    7. source_phrase_overlap   — correct answer doesn't echo source_excerpt
+    3. ordering_structure      — ordering steps present + options are valid permutations
+    4. option_count            — matches configured num_options
+    5. distractor_rationales   — all distractors have rationale text
+    6. bloom_difficulty        — bloom level consistent with difficulty
+    7. length_parity           — correct answer not >30% longer than distractors
+    8. source_phrase_overlap   — correct answer doesn't echo source_excerpt
 
     Args:
         mcq:      The MCQ to validate.
@@ -324,6 +411,7 @@ def run_all_validators(
         # Use the MCQ's own declared question_type so ordering questions can coexist
         # with single_correct questions in the same mixed-type run.
         validate_uniqueness(mcq, mcq.question_type),
+        validate_ordering_structure(mcq),
         validate_option_count(mcq, config.num_options),
         validate_distractor_rationales(mcq),
         validate_bloom_difficulty_alignment(mcq),

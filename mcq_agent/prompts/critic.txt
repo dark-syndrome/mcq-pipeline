@@ -28,8 +28,13 @@ a) **Source grounding**: Is the marked correct answer explicitly supported by th
 
 b) **Uniqueness / ordering correctness**:
    - For single_correct: Is exactly one option unambiguously correct? Could a knowledgeable person reasonably argue for another option? If yes, mark FAIL.
-   - For ordering: All options must have is_correct=false. The correct_order field must list a sequence that can be verified from the source. If the sequence is ambiguous or not derivable from the source, mark FAIL.
-   - For multiple_correct: At least one but not all options are correct. Each correct option must be independently verifiable from the source.
+   - For ordering: The question uses a two-part structure. The numbered steps live in the `ordering_statements` field AND must be visible in the question stem; each option is a sequence string of those step numbers (e.g. "3 → 1 → 4 → 2"). Verify ALL of the following or mark FAIL:
+       * `ordering_statements` is present and non-empty, and the numbered steps appear in the question text. If the stem only says "the following steps are listed out of order" but the actual numbered steps are MISSING, the question is incomplete and unanswerable — mark FAIL on self-containment.
+       * Exactly one option has is_correct=true (the correct sequence); the rest have is_correct=false with a distractor_rationale.
+       * Every option's sequence references only valid step numbers (1..N where N is the number of statements) and lists all of them once.
+       * The single correct sequence is verifiable from the source. If the correct order is ambiguous or not derivable from the source, mark FAIL.
+       * Note: the legacy `correct_order` field must be null — correctness is encoded via is_correct on the option.
+   - For multiple_correct: At least TWO but not all options are correct. Each correct option must be independently verifiable from the source. If only one option is correct, the type is mislabelled — mark FAIL.
 
 c) **Distractor plausibility**: Are the wrong options plausible to someone with partial knowledge? Or are any of them absurd, off-topic, or obviously wrong? If any distractor is implausible, mark FAIL.
 

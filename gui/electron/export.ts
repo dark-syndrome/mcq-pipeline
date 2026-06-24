@@ -56,6 +56,7 @@ export interface ExportRow {
   question_type: string
   question_number: number | null
   generation_number: number
+  ordering_statements?: string[]
   [k: string]: unknown
 }
 
@@ -64,6 +65,24 @@ function esc(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+}
+
+// Ordering questions carry their numbered steps in `ordering_statements`, but
+// the exported `question` text usually omits them. Inline the numbered steps so
+// the question is answerable. If the statements already appear verbatim in the
+// question text, return it as-is to avoid duplication.
+function renderOrderingStem(r: ExportRow): string {
+  const stmts = r.ordering_statements
+  if (
+    r.question_type !== 'ordering' ||
+    !Array.isArray(stmts) ||
+    stmts.length === 0
+  ) {
+    return r.question
+  }
+  if (stmts.every((s) => r.question.includes(s))) return r.question
+  const numbered = stmts.map((s, i) => `${i + 1}. ${s}`).join('\n')
+  return `${r.question}\n\n${numbered}`
 }
 
 // --- JSON ---
@@ -78,7 +97,7 @@ export function buildJson(rows: ExportRow[], o: ExportOptions): string {
         : {}),
     }))
     const obj: Record<string, unknown> = {
-      question: r.question,
+      question: renderOrderingStem(r),
       options: opts,
       source_excerpt: r.source_excerpt,
       source_heading: r.source_heading,
@@ -141,9 +160,8 @@ export function buildHtml(rows: ExportRow[], o: ExportOptions): string {
         o.explanations && r.explanation
           ? `<p class="expl"><i>Explanation:</i> ${esc(r.explanation)}</p>`
           : ''
-      return `<div class="q"><p class="stem"><b>${i + 1}.</b> ${esc(
-        r.question,
-      )}</p><ul>${opts}</ul>${meta}${expl}</div>`
+      const stem = esc(renderOrderingStem(r)).replace(/\n/g, '<br>')
+      return `<div class="q"><p class="stem"><b>${i + 1}.</b> ${stem}</p><ul>${opts}</ul>${meta}${expl}</div>`
     })
     .join('')
   const answerKey = o.answerKey
@@ -286,9 +304,14 @@ export async function buildDocx(
   }
 
   rows.forEach((r, i) => {
+    const stemLines = renderOrderingStem(r).split('\n')
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `${i + 1}. ${r.question}`, bold: true })],
+        children: stemLines.flatMap((line, li) =>
+          li === 0
+            ? [new TextRun({ text: `${i + 1}. ${line}`, bold: true })]
+            : [new TextRun({ text: line, bold: true, break: 1 })],
+        ),
         spacing: { before: 200, after: 60 },
       }),
     )
@@ -378,10 +401,13 @@ export function buildXlsx(rows: ExportRow[], o: ExportOptions): Buffer {
     const sorted = [...r.options].sort((a, b) =>
       (a.label ?? '').localeCompare(b.label ?? '', 'en'),
     )
-    const answer = sorted.find((op) => op.is_correct)?.label ?? ''
+    const answer = sorted
+      .filter((op) => op.is_correct)
+      .map((op) => op.label)
+      .join(', ')
     const row: (string | number | null)[] = [
       i + 1,
-      r.question,
+      renderOrderingStem(r),
       sorted[0]?.text ?? '',
       sorted[1]?.text ?? '',
       sorted[2]?.text ?? '',
@@ -462,17 +488,17 @@ export function buildPaperXlsx(rows: ExportRow[]): Buffer {
     const sorted = [...r.options].sort((a, b) =>
       (a.label ?? '').localeCompare(b.label ?? '', 'en'),
     )
-    const correctOpt = sorted.find((op) => op.is_correct)
-    if (!correctOpt) {
+    const correctLabels = sorted.filter((op) => op.is_correct).map((op) => op.label)
+    if (!correctLabels.length) {
       console.warn(`[export] Row ${i + 1} has no correct option — skipping`)
       return
     }
-    const key = correctOpt.label
+    const key = correctLabels.join(', ')
     const tagList = Array.isArray(r['tags']) ? (r['tags'] as string[]) : []
     const visibility = tagList.includes('IS_PUBLIC') ? 'IS_PUBLIC' : 'IS_PRIVATE'
     aoa.push([
       i + 1,
-      r.question,
+      renderOrderingStem(r),
       sorted[0]?.text ?? '',
       sorted[1]?.text ?? '',
       sorted[2]?.text ?? '',

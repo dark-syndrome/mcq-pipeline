@@ -83,6 +83,7 @@ export interface PaperRow {
   question_type: string
   sub_topic: string | null
   tags: string[]
+  ordering_statements?: string[]
 }
 
 export interface PaperQueryResult {
@@ -226,6 +227,9 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
       question_type: String(m.question_type ?? ''),
       sub_topic: (m.sub_topic as string) ?? null,
       tags: Array.isArray(m.tags) ? (m.tags as string[]) : [],
+      ordering_statements: Array.isArray(m.ordering_statements)
+        ? (m.ordering_statements as string[])
+        : undefined,
     }
   }
 
@@ -380,6 +384,9 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
       question_type: String(r.question_type ?? ''),
       sub_topic: (r.sub_topic as string) ?? null,
       tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
+      ordering_statements: Array.isArray(r.ordering_statements)
+        ? (r.ordering_statements as string[])
+        : undefined,
     }
   }
 

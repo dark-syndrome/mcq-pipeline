@@ -9,6 +9,21 @@ interface Props {
   onToggleExclude: (id: number) => void
 }
 
+// Ordering questions store their numbered steps in `ordering_statements`; the
+// `question` text alone is unanswerable, so inline the steps for display.
+function orderingStem(row: McqRow): string {
+  const stmts = row.ordering_statements
+  if (
+    row.question_type !== 'ordering' ||
+    !Array.isArray(stmts) ||
+    stmts.length === 0
+  ) {
+    return row.question
+  }
+  if (stmts.every((s) => row.question.includes(s))) return row.question
+  return `${row.question}\n\n${stmts.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+}
+
 function deficitNote(result: QueryResult): string | null {
   if (!result.buckets) return null
   const short = result.buckets.filter((b) => b.got < b.requested)
@@ -42,7 +57,9 @@ function McqCard({
           title="Include in export set"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{row.question}</p>
+          <p className="whitespace-pre-line text-sm font-medium">
+            {orderingStem(row)}
+          </p>
           <ul className="mt-2 space-y-1">
             {row.options.map((o) => (
               <li

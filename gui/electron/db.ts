@@ -374,6 +374,9 @@ function parseRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
       question_type: String(mcq.question_type ?? ''),
       sub_topic: (mcq.sub_topic as string) ?? null,
       tags: Array.isArray(mcq.tags) ? (mcq.tags as string[]) : [],
+      ordering_statements: Array.isArray(mcq.ordering_statements)
+        ? (mcq.ordering_statements as string[])
+        : undefined,
     }
   })
 }

@@ -189,6 +189,21 @@ function SubTopicRatioRow({
 
 // ─── Preview: card and table ─────────────────────────────────────────────────
 
+// Ordering questions store their numbered steps in `ordering_statements`; the
+// `question` text alone is unanswerable, so inline the steps for display.
+function orderingStem(row: McqRow): string {
+  const stmts = row.ordering_statements
+  if (
+    row.question_type !== 'ordering' ||
+    !Array.isArray(stmts) ||
+    stmts.length === 0
+  ) {
+    return row.question
+  }
+  if (stmts.every((s) => row.question.includes(s))) return row.question
+  return `${row.question}\n\n${stmts.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+}
+
 function PaperCardView({
   rows,
   excluded,
@@ -216,7 +231,9 @@ function PaperCardView({
               title="Include in paper"
             />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{r.question}</p>
+              <p className="whitespace-pre-line text-sm font-medium">
+                {orderingStem(r)}
+              </p>
               <ul className="mt-2 space-y-1">
                 {r.options.map((o) => (
                   <li

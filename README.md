@@ -808,17 +808,20 @@ Classifies the failure and applies the minimum intervention rather than discardi
 
 ### Quality Gates
 
-**Validators (`validators.py`) — 7 deterministic checks, all free:**
+**Validators (`validators.py`) — 8 deterministic checks, all free:**
 
 | # | Check |
 |---|---|
 | 1 | `source_grounding` — fuzzy-match score < threshold |
-| 2 | `uniqueness` — wrong correct option count |
-| 3 | `option_count` — doesn't match `num_options` |
-| 4 | `distractor_rationales` — missing rationale on any wrong option |
-| 5 | `bloom_difficulty_alignment` |
-| 6 | `length_parity` — correct answer >30% longer than median distractor |
-| 7 | `source_phrase_overlap` — 5-gram verbatim copy from excerpt |
+| 2 | `uniqueness` — wrong correct option count (`multiple_correct` requires ≥2 correct) |
+| 3 | `ordering_structure` — ordering steps present + every option is a valid permutation of `1..N` |
+| 4 | `option_count` — doesn't match `num_options` |
+| 5 | `distractor_rationales` — missing rationale on any wrong option |
+| 6 | `bloom_difficulty_alignment` |
+| 7 | `length_parity` — correct answer >30% longer than median distractor |
+| 8 | `source_phrase_overlap` — 5-gram verbatim copy from excerpt |
+
+> `ordering_structure` is the guard against the failure where an ORDERING question's numbered steps are missing, leaving only bare sequences (`3 → 1 → 4 → 2`) — an unanswerable question. Exporters also inline `ordering_statements` into the question text and join *all* correct labels for `multiple_correct` answer keys.
 
 `shuffle_correct_answer_positions()` randomly reassigns A/B/C/D labels after generation to eliminate LLM position bias.
 
