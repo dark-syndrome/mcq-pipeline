@@ -200,14 +200,21 @@ export function runReducer(
         stages[i].endedAt = Date.now()
         stages[i].detail = ev.message
       }
-      return { ...state, stages, running: false, error: { stage: ev.stage, message: ev.message } }
+      // Don't set running:false here — process_exit is the authoritative signal that
+      // proc is null in the main process. Setting it early creates a window where
+      // a fast "New run" click races the OS process close.
+      return { ...state, stages, error: { stage: ev.stage, message: ev.message } }
     }
 
-    case 'process_exit':
-      if (state.running && !state.summary && !state.error) {
-        stages.forEach((s) => {
-          if (s.status === 'running') s.status = 'failed'
-        })
+    case 'process_exit': {
+      if (!state.running) return state
+      stages.forEach((s) => {
+        if (s.status === 'running') {
+          s.status = 'failed'
+          s.endedAt = Date.now()
+        }
+      })
+      if (!state.summary && !state.error) {
         return {
           ...state,
           stages,
@@ -215,7 +222,8 @@ export function runReducer(
           error: { stage: 'process', message: `Pipeline exited (code ${ev.code ?? '?'})` },
         }
       }
-      return state
+      return { ...state, stages, running: false }
+    }
 
     default:
       return state

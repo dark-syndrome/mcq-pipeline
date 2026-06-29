@@ -22,11 +22,11 @@ export function readConfig() {
       input:
         c.generator_pricing?.input_per_million_tokens ??
         c.pricing?.input_per_million_tokens ??
-        0.15,
+        1.50,
       output:
         c.generator_pricing?.output_per_million_tokens ??
         c.pricing?.output_per_million_tokens ??
-        0.6,
+        9.00,
     },
     defaults: {
       num_questions: c.num_questions ?? 10,

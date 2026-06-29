@@ -14,6 +14,7 @@ const api = {
     typeDistribution: () => ipcRenderer.invoke('db:typeDistribution'),
     difficultyDistribution: () =>
       ipcRenderer.invoke('db:difficultyDistribution'),
+    subtopicCounts: () => ipcRenderer.invoke('db:subtopicCounts'),
     costPerRun: (limit?: number) => ipcRenderer.invoke('db:costPerRun', limit),
     criticCriteriaHeatmap: (limit?: number) =>
       ipcRenderer.invoke('db:criticCriteriaHeatmap', limit),
@@ -90,6 +91,16 @@ const api = {
     const listener = (_: unknown, e: unknown) => cb(e)
     ipcRenderer.on('pipeline:event', listener)
     return () => ipcRenderer.removeListener('pipeline:event', listener)
+  },
+  dedup: {
+    isRunning: () => ipcRenderer.invoke('dedup:isRunning'),
+    start: (params: unknown) => ipcRenderer.invoke('dedup:start', params),
+    cancel: () => ipcRenderer.invoke('dedup:cancel'),
+    onEvent: (cb: (e: unknown) => void) => {
+      const listener = (_: unknown, e: unknown) => cb(e)
+      ipcRenderer.on('dedup:event', listener)
+      return () => ipcRenderer.removeListener('dedup:event', listener)
+    },
   },
 }
 

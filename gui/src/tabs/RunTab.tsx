@@ -13,6 +13,8 @@ export default function RunTab() {
   const [report, setReport] = useState<LintReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [runParams, setRunParams] = useState<RunStartParams | null>(null)
+  // True when a Python subprocess is already running (e.g. renderer reloaded mid-run).
+  const [orphanRunning, setOrphanRunning] = useState(false)
   const [availableTags, setAvailableTags] = useState<string[]>([])
   const [availableCourses, setAvailableCourses] = useState<string[]>([])
   const [config, setConfig] = useState<RunConfig>({
@@ -25,6 +27,14 @@ export default function RunTab() {
     course: '',
     isPublic: true,
   })
+
+  // Check on mount whether a background Python run is still alive (e.g. after a
+  // renderer reload while a generation was in progress).
+  useEffect(() => {
+    window.api?.run.isRunning().then((running) => {
+      if (running) setOrphanRunning(true)
+    }).catch(() => {})
+  }, [])
 
   // Load defaults from config.yaml and tag catalogs from the DB.
   useEffect(() => {
@@ -82,7 +92,8 @@ export default function RunTab() {
     !!file &&
     !!report &&
     report.overall_status !== 'FAIL' &&
-    config.types.length > 0
+    config.types.length > 0 &&
+    !orphanRunning
 
   const onGenerate = () => {
     if (!file || !canGenerate) return
@@ -113,6 +124,27 @@ export default function RunTab() {
         Upload a .md lesson, review the free source check, then configure and launch
         the pipeline.
       </p>
+
+      {orphanRunning && (
+        <div className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-4">
+          <p className="text-sm font-semibold text-warning">
+            A generation run is still active in the background.
+          </p>
+          <p className="mt-1 text-xs text-warning/80">
+            The pipeline subprocess kept running after the UI lost track of it
+            (e.g. the renderer reloaded mid-run). Cancel it before starting a new
+            run, or wait for it to finish.
+          </p>
+          <button
+            onClick={() =>
+              window.api.run.cancel().then(() => setOrphanRunning(false)).catch(() => setOrphanRunning(false))
+            }
+            className="mt-2 rounded-md border border-warning/50 px-3 py-1 text-xs text-warning hover:bg-warning/10"
+          >
+            Cancel background run
+          </button>
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-[1fr_380px] gap-6">
         <div className="space-y-4">
@@ -153,8 +185,8 @@ function estimateCost(
   count: number,
   cfg: AppConfig | null,
 ): { tokens: number; cost: number } {
-  const priceIn = (cfg?.pricing.input ?? 0.15) / 1_000_000
-  const priceOut = (cfg?.pricing.output ?? 0.6) / 1_000_000
+  const priceIn = (cfg?.pricing.input ?? 1.50) / 1_000_000
+  const priceOut = (cfg?.pricing.output ?? 9.00) / 1_000_000
   const factor = cfg?.defaults.over_generation_factor ?? 2.0
   const candidates = Math.ceil(count * factor)
   const estIn = sourceWords * 1.3 + candidates * 320

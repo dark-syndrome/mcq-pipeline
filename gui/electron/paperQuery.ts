@@ -64,6 +64,13 @@ export interface PaperBucket {
   got: number
 }
 
+export interface SubTopicShortfall {
+  subTopic: string
+  difficulty: string
+  requested: number
+  got: number
+}
+
 export interface PaperRow {
   id: number
   run_id: string
@@ -89,6 +96,7 @@ export interface PaperRow {
 export interface PaperQueryResult {
   rows: PaperRow[]
   buckets: PaperBucket[]
+  subTopicShortfalls: SubTopicShortfall[]
   source: 'supabase' | 'sqlite'
 }
 
@@ -199,12 +207,11 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
           { difficulty: 'medium', requested: params.mediumCount, got: 0 },
           { difficulty: 'hard/expert', requested: params.hardCount, got: 0 },
         ],
+        subTopicShortfalls: [],
         source: 'supabase',
       }
     }
   }
-
-  const POOL = 200
 
   function parsePaperRow(row: Record<string, unknown>): PaperRow {
     const m = (row.mcq_json ?? {}) as Record<string, unknown>
@@ -239,19 +246,22 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
     subTopic?: string,
   ): Promise<PaperRow[]> {
     if (need <= 0) return []
+    // Pool must be large enough to cover the requested count with room for
+    // randomization (especially in multi-paper mode where need = numPapers × perPaper).
+    const poolSize = Math.max(need * 2, 200)
     let q = sb
       .from('mcqs')
       .select('id, run_id, question_number, mcq_json, difficulty')
       .eq('passed', 1)
       .in('difficulty', diffs)
-      .limit(POOL)
+      .limit(poolSize)
     if (runIds) q = q.in('run_id', runIds)
     const { data } = await q
     if (!data?.length) return []
-    let pool = [...data].sort(() => Math.random() - 0.5)
+    let candidates = [...data].sort(() => Math.random() - 0.5)
     // Filter by sub_topic client-side (no PostgREST json path filter available on all setups)
     if (subTopic) {
-      pool = pool.filter((row) => {
+      candidates = candidates.filter((row) => {
         try {
           const m = typeof row.mcq_json === 'string'
             ? JSON.parse(row.mcq_json as string)
@@ -260,13 +270,14 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
         } catch { return false }
       })
     }
-    return pool.slice(0, need).map(parsePaperRow)
+    return candidates.slice(0, need).map(parsePaperRow)
   }
 
   // Sub-topic allocation mode: fetch per-sub-topic-per-difficulty bucket.
   if (params.subTopicAllocs?.length) {
     const allRows: PaperRow[] = []
     const buckets: PaperBucket[] = []
+    const shortfalls: SubTopicShortfall[] = []
     const easyCounts: Record<string, number> = {}
     const medCounts: Record<string, number> = {}
     const hardCounts: Record<string, number> = {}
@@ -282,6 +293,12 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
         easyCounts[alloc.subTopic] = eR.length
         medCounts[alloc.subTopic] = mR.length
         hardCounts[alloc.subTopic] = hR.length
+        if (eR.length < alloc.easyCount)
+          shortfalls.push({ subTopic: alloc.subTopic, difficulty: 'easy', requested: alloc.easyCount, got: eR.length })
+        if (mR.length < alloc.mediumCount)
+          shortfalls.push({ subTopic: alloc.subTopic, difficulty: 'medium', requested: alloc.mediumCount, got: mR.length })
+        if (hR.length < alloc.hardCount)
+          shortfalls.push({ subTopic: alloc.subTopic, difficulty: 'hard', requested: alloc.hardCount, got: hR.length })
       }),
     )
 
@@ -297,6 +314,7 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
     return {
       rows: allRows.sort(() => Math.random() - 0.5),
       buckets,
+      subTopicShortfalls: shortfalls,
       source: 'supabase',
     }
   }
@@ -316,6 +334,7 @@ async function sbQueryPaper(params: PaperQueryParams): Promise<PaperQueryResult>
       { difficulty: 'medium', requested: params.mediumCount, got: mediumRows.length },
       { difficulty: 'hard/expert', requested: params.hardCount, got: hardRows.length },
     ],
+    subTopicShortfalls: [],
     source: 'supabase',
   }
 }
@@ -408,6 +427,7 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
   if (params.subTopicAllocs?.length) {
     let idx = 0
     const allRows: PaperRow[] = []
+    const shortfalls: SubTopicShortfall[] = []
     let totalEReq = 0, totalMReq = 0, totalHReq = 0
     let totalEGot = 0, totalMGot = 0, totalHGot = 0
 
@@ -424,6 +444,12 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
       totalEGot += easy.got
       totalMGot += medium.got
       totalHGot += hard.got
+      if (easy.got < alloc.easyCount)
+        shortfalls.push({ subTopic: alloc.subTopic, difficulty: 'easy', requested: alloc.easyCount, got: easy.got })
+      if (medium.got < alloc.mediumCount)
+        shortfalls.push({ subTopic: alloc.subTopic, difficulty: 'medium', requested: alloc.mediumCount, got: medium.got })
+      if (hard.got < alloc.hardCount)
+        shortfalls.push({ subTopic: alloc.subTopic, difficulty: 'hard', requested: alloc.hardCount, got: hard.got })
       allRows.push(
         ...easy.rows.map((r) => toPaperRow(r, idx++)),
         ...medium.rows.map((r) => toPaperRow(r, idx++)),
@@ -438,6 +464,7 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
         { difficulty: 'medium', requested: totalMReq, got: totalMGot },
         { difficulty: 'hard/expert', requested: totalHReq, got: totalHGot },
       ],
+      subTopicShortfalls: shortfalls,
       source: 'sqlite',
     }
   }
@@ -462,6 +489,7 @@ async function sqliteQueryPaper(params: PaperQueryParams): Promise<PaperQueryRes
       { difficulty: 'medium', requested: params.mediumCount, got: medium.got },
       { difficulty: 'hard/expert', requested: params.hardCount, got: hard.got },
     ],
+    subTopicShortfalls: [],
     source: 'sqlite',
   }
 }

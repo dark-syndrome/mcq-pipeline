@@ -8,6 +8,7 @@ import { REPO_ROOT, resolvePython } from './paths'
 // (GUI spec §8.2) to the renderer over the 'pipeline:event' channel.
 
 let proc: ChildProcess | null = null
+let dedupProc: ChildProcess | null = null
 
 export interface RunParams {
   input: string
@@ -25,6 +26,10 @@ export interface RunParams {
 
 export function isRunning(): boolean {
   return proc !== null
+}
+
+export function isDedupRunning(): boolean {
+  return dedupProc !== null
 }
 
 // Shared spawn/stream/error handling for any mcq_agent.cli subcommand that
@@ -119,5 +124,67 @@ export function cancelRun(): void {
   if (proc) {
     proc.kill()
     proc = null
+  }
+}
+
+export interface DedupParams {
+  threshold?: number
+  apply?: boolean
+  applyCloud?: boolean
+  includeSupabase?: boolean
+}
+
+export function startDedup(win: BrowserWindow, params: DedupParams): void {
+  if (dedupProc) throw new Error('A dedup scan is already in progress.')
+  const py = resolvePython()
+  const scriptPath = path.join(REPO_ROOT, 'scripts', 'dedup_db.py')
+
+  const send = (e: unknown) => {
+    if (!win.isDestroyed()) win.webContents.send('dedup:event', e)
+  }
+
+  const args = [scriptPath, '--json-events']
+  if (params.threshold != null) args.push('--threshold', String(params.threshold))
+  if (params.apply) args.push('--apply')
+  if (params.applyCloud) args.push('--apply-cloud')
+  if (params.includeSupabase) args.push('--include-supabase')
+
+  dedupProc = spawn(py, args, {
+    cwd: REPO_ROOT,
+    env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+  })
+
+  const rl = readline.createInterface({ input: dedupProc.stdout! })
+  rl.on('line', (line) => {
+    const text = line.trim()
+    if (!text) return
+    try {
+      send(JSON.parse(text))
+    } catch { /* ignore non-JSON */ }
+  })
+
+  let stderrTail = ''
+  dedupProc.stderr!.on('data', (d: Buffer) => {
+    stderrTail = (stderrTail + d.toString()).slice(-4000)
+  })
+
+  dedupProc.on('error', (err) => {
+    send({ event: 'dedup_error', message: `Failed to start dedup (${py}): ${err.message}` })
+    dedupProc = null
+  })
+
+  dedupProc.on('close', (code) => {
+    if (code && code !== 0 && !stderrTail.includes('dedup_error')) {
+      send({ event: 'dedup_error', message: stderrTail.trim() || `Dedup exited with code ${code}` })
+    }
+    send({ event: 'dedup_process_exit', code })
+    dedupProc = null
+  })
+}
+
+export function cancelDedup(): void {
+  if (dedupProc) {
+    dedupProc.kill()
+    dedupProc = null
   }
 }

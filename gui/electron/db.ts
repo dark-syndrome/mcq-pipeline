@@ -256,6 +256,38 @@ export async function filterOptions(): Promise<{
   return { sourceFiles: files, sourceHeadings: headings, runs }
 }
 
+export async function subtopicCounts(): Promise<{
+  tag: string
+  total: number
+  easy: number
+  medium: number
+  hard: number
+}[]> {
+  const d = await ensure()
+  if (!d) return []
+  return rowsToObjects(
+    d,
+    `SELECT
+       tt.tag,
+       COUNT(CASE WHEN m.id IS NOT NULL THEN 1 END)                                      AS total,
+       COUNT(CASE WHEN json_extract(m.mcq_json,'$.difficulty') = 'easy'   THEN 1 END)   AS easy,
+       COUNT(CASE WHEN json_extract(m.mcq_json,'$.difficulty') = 'medium' THEN 1 END)   AS medium,
+       COUNT(CASE WHEN json_extract(m.mcq_json,'$.difficulty') = 'hard'   THEN 1 END)   AS hard
+     FROM topic_tags tt
+     LEFT JOIN mcqs m
+       ON json_extract(m.mcq_json,'$.sub_topic') = tt.tag
+      AND m.passed = 1
+     GROUP BY tt.tag
+     ORDER BY total DESC`,
+  ).map((r) => ({
+    tag: String(r.tag),
+    total: Number(r.total),
+    easy: Number(r.easy),
+    medium: Number(r.medium),
+    hard: Number(r.hard),
+  }))
+}
+
 export async function distinctSubTopics(): Promise<string[]> {
   const d = await ensure()
   if (!d) return []

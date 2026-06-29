@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
-import { cancelRun, isRunning } from './sidecar'
+import { cancelDedup, cancelRun, isDedupRunning, isRunning } from './sidecar'
 
 // Window chrome only. IPC (Python sidecar + better-sqlite3) is added in Session 2.
 function createWindow() {
@@ -26,6 +26,7 @@ function createWindow() {
   // so listeners never accumulate and it covers every subprocess flow.
   win.on('closed', () => {
     if (isRunning()) cancelRun()
+    if (isDedupRunning()) cancelDedup()
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {

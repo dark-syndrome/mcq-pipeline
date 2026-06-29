@@ -8,6 +8,7 @@ import type {
   DashboardKpis,
   DbHealth,
   DbStatus,
+  DedupEvent,
   DifficultySlice,
   EvalQuestion,
   EvalSet,
@@ -31,6 +32,7 @@ import type {
   RunHistoryRow,
   RunRow,
   SourceLinterStats,
+  SubtopicCount,
   SupabasePushEvent,
   TokenUsageByStage,
   TypeSlice,
@@ -62,6 +64,7 @@ export interface Api {
     questionsPerGeneration: (limit?: number) => Promise<GenerationBar[]>
     typeDistribution: () => Promise<TypeSlice[]>
     difficultyDistribution: () => Promise<DifficultySlice[]>
+    subtopicCounts: () => Promise<SubtopicCount[]>
     costPerRun: (limit?: number) => Promise<CostPoint[]>
     criticCriteriaHeatmap: (limit?: number) => Promise<CriticHeatmap>
     validatorFailureBreakdown: () => Promise<ValidatorFailure[]>
@@ -131,6 +134,12 @@ export interface Api {
   onPipelineEvent: (
     cb: (e: PipelineEvent | ProcessExitEvent) => void,
   ) => () => void
+  dedup: {
+    isRunning: () => Promise<boolean>
+    start: (params: { threshold?: number; apply?: boolean; applyCloud?: boolean; includeSupabase?: boolean }) => Promise<void>
+    cancel: () => Promise<void>
+    onEvent: (cb: (e: DedupEvent) => void) => () => void
+  }
 }
 
 declare global {

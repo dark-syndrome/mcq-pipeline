@@ -7,6 +7,7 @@ import type {
   PaperHeader,
   PaperQueryParams,
   SubTopicAlloc,
+  SubTopicShortfall,
 } from '../types'
 import { BloomBadge, DifficultyBadge, TypeBadge } from './Badge'
 
@@ -324,6 +325,61 @@ function PaperTableView({
   )
 }
 
+// ─── Shortfall panel ─────────────────────────────────────────────────────────
+
+function ShortfallPanel({ shortfalls }: { shortfalls: SubTopicShortfall[] }) {
+  // Group by subTopic so each topic shows one row with all its difficulty gaps.
+  const grouped = shortfalls.reduce<Record<string, SubTopicShortfall[]>>(
+    (acc, s) => {
+      ;(acc[s.subTopic] ??= []).push(s)
+      return acc
+    },
+    {},
+  )
+
+  const DIFF_COLOR: Record<string, string> = {
+    easy: '#22c55e',
+    medium: '#f59e0b',
+    hard: '#ef4444',
+    'hard/expert': '#ef4444',
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-warning/40 bg-warning/8 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[11px] font-semibold text-warning">
+          Shortfall — topics need more questions
+        </span>
+      </div>
+      <div className="space-y-2">
+        {Object.entries(grouped).map(([topic, items]) => (
+          <div key={topic}>
+            <p className="text-[11px] font-medium text-text">{topic}</p>
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+              {items.map((s) => (
+                <span
+                  key={s.difficulty}
+                  className="text-[11px] tabular-nums"
+                  style={{ color: DIFF_COLOR[s.difficulty] ?? '#888' }}
+                >
+                  {s.difficulty}: {s.got}/{s.requested}
+                  {' '}
+                  <span className="text-muted">
+                    (need {s.requested - s.got} more)
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-muted">
+        Generate more questions for these topics in the Run tab to fill the gaps.
+      </p>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function QuestionPaperBuilder() {
@@ -353,12 +409,21 @@ export default function QuestionPaperBuilder() {
   const [showExplanations, setShowExplanations] = useState(false)
   const [showMetadata, setShowMetadata] = useState(false)
 
-  // Results
-  const [rows, setRows] = useState<McqRow[]>([])
-  const [excluded, setExcluded] = useState<Set<number>>(new Set())
+  // Number of non-overlapping papers to build from one pool fetch.
+  const [numPapers, setNumPapers] = useState(1)
+
+  // Results — one entry per paper (numPapers === 1 behaves identically to before).
+  const [papers, setPapers] = useState<McqRow[][]>([])
+  const [paperExcluded, setPaperExcluded] = useState<Set<number>[]>([])
+  const [activePaper, setActivePaper] = useState(0)
   const [buckets, setBuckets] = useState<PaperBucket[] | null>(null)
+  const [shortfalls, setShortfalls] = useState<SubTopicShortfall[]>([])
   const [querySource, setQuerySource] = useState<string | null>(null)
   const [view, setView] = useState<'card' | 'table'>('card')
+
+  // Convenience derived values for the active paper.
+  const rows = papers[activePaper] ?? []
+  const excluded = paperExcluded[activePaper] ?? new Set<number>()
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -466,10 +531,12 @@ export default function QuestionPaperBuilder() {
       s.includes(t) ? s.filter((x) => x !== t) : [...s, t],
     )
   const toggleExclude = (id: number) =>
-    setExcluded((s) => {
-      const next = new Set(s)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+    setPaperExcluded((prev) => {
+      const next = [...prev]
+      const s = new Set(next[activePaper] ?? [])
+      if (s.has(id)) s.delete(id)
+      else s.add(id)
+      next[activePaper] = s
       return next
     })
 
@@ -480,19 +547,46 @@ export default function QuestionPaperBuilder() {
     if (loading) return
     setLoading(true)
     setError(null)
+    // For multi-paper: request numPapers × each count so the pool covers all papers.
+    const n = numPapers
+    const subTopicAllocsScaled = subTopicAllocs?.length
+      ? subTopicAllocs.map((a) => ({
+          ...a,
+          easyCount: a.easyCount * n,
+          mediumCount: a.mediumCount * n,
+          hardCount: a.hardCount * n,
+        }))
+      : undefined
     const params: PaperQueryParams = {
-      easyCount: counts.easy,
-      mediumCount: counts.medium,
-      hardCount: counts.hard,
+      easyCount: counts.easy * n,
+      mediumCount: counts.medium * n,
+      hardCount: counts.hard * n,
       generationNumbers: selectedGens.length ? selectedGens : undefined,
       topics: selectedTopics.length ? selectedTopics : undefined,
-      subTopicAllocs: subTopicAllocs?.length ? subTopicAllocs : undefined,
+      subTopicAllocs: subTopicAllocsScaled?.length ? subTopicAllocsScaled : undefined,
     }
     try {
       const result = await window.api.paper.queryMcqs(params)
-      setRows(result.rows)
-      setExcluded(new Set())
+
+      // Partition the shuffled pool into n non-overlapping papers by difficulty.
+      const allRows = result.rows as McqRow[]
+      const easyPool = allRows.filter((r) => r.difficulty === 'easy')
+      const medPool = allRows.filter((r) => r.difficulty === 'medium')
+      const hardPool = allRows.filter((r) => ['hard', 'expert'].includes(r.difficulty))
+
+      const newPapers: McqRow[][] = []
+      for (let i = 0; i < n; i++) {
+        const easy = easyPool.slice(i * counts.easy, (i + 1) * counts.easy)
+        const med = medPool.slice(i * counts.medium, (i + 1) * counts.medium)
+        const hard = hardPool.slice(i * counts.hard, (i + 1) * counts.hard)
+        newPapers.push([...easy, ...med, ...hard].sort(() => Math.random() - 0.5))
+      }
+
+      setPapers(newPapers)
+      setPaperExcluded(newPapers.map(() => new Set<number>()))
+      setActivePaper(0)
       setBuckets(result.buckets)
+      setShortfalls(result.subTopicShortfalls ?? [])
       setQuerySource(result.source)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -503,28 +597,57 @@ export default function QuestionPaperBuilder() {
 
   const selectedRows = rows.filter((r) => !excluded.has(r.id))
 
-  const onExport = async () => {
-    if (!selectedRows.length || exporting) return
-    setExporting(true)
-    setToast(null)
-    setSavedPath(null)
+  const buildExportOpts = (paperIdx: number): { rows: McqRow[]; opts: ExportOptions; name: string } => {
+    const pRows = (papers[paperIdx] ?? []).filter(
+      (r) => !(paperExcluded[paperIdx] ?? new Set()).has(r.id),
+    )
+    const paperHeader =
+      numPapers > 1
+        ? { ...header, title: `${header.title} — Paper ${paperIdx + 1}` }
+        : header
     const opts: ExportOptions = {
       format: exportFmt,
       answerKey,
       explanations: showExplanations,
       metadata: showMetadata,
-      paperHeader: header,
+      paperHeader,
     }
+    return { rows: pRows, opts, name: defaultPaperName(paperHeader, pRows.length) }
+  }
+
+  const onExport = async (paperIdx = activePaper) => {
+    const { rows: pRows, opts, name } = buildExportOpts(paperIdx)
+    if (!pRows.length || exporting) return
+    setExporting(true)
+    setToast(null)
+    setSavedPath(null)
     try {
-      const saved = await window.api.export.run(
-        selectedRows,
-        opts,
-        defaultPaperName(header, selectedRows.length),
-      )
+      const saved = await window.api.export.run(pRows, opts, name)
       if (saved) {
         setSavedPath(saved)
-        setToast(`Exported ${selectedRows.length} question${selectedRows.length === 1 ? '' : 's'}`)
+        setToast(`Exported ${pRows.length} question${pRows.length === 1 ? '' : 's'}`)
       }
+    } catch (e) {
+      setToast(`Export failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const onExportAll = async () => {
+    if (exporting) return
+    setExporting(true)
+    setToast(null)
+    setSavedPath(null)
+    let exported = 0
+    try {
+      for (let i = 0; i < papers.length; i++) {
+        const { rows: pRows, opts, name } = buildExportOpts(i)
+        if (!pRows.length) continue
+        const saved = await window.api.export.run(pRows, opts, name)
+        if (saved) exported++
+      }
+      setToast(exported > 0 ? `Exported ${exported} paper${exported === 1 ? '' : 's'}` : 'No files saved')
     } catch (e) {
       setToast(`Export failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -739,7 +862,30 @@ export default function QuestionPaperBuilder() {
                   Paper Configuration
                 </h4>
 
-                <Field label="Total Questions">
+                <Field label="Number of Papers">
+                  <div className="mt-1 flex gap-1">
+                    {[1, 2, 3, 4].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setNumPapers(n)}
+                        className={`flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors ${
+                          numPapers === n
+                            ? 'border-primary bg-primary text-white'
+                            : 'border-border text-muted hover:border-primary'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  {numPapers > 1 && (
+                    <p className="mt-1 text-[11px] text-muted">
+                      {numPapers} papers · no shared questions between them.
+                    </p>
+                  )}
+                </Field>
+
+                <Field label="Questions per Paper">
                   <input
                     type="number"
                     value={totalQ}
@@ -964,21 +1110,61 @@ export default function QuestionPaperBuilder() {
                 </div>
               )}
 
-              <button
-                onClick={onExport}
-                disabled={!selectedRows.length || exporting}
-                className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                  selectedRows.length && !exporting
-                    ? 'bg-primary text-white hover:bg-primary/90'
-                    : 'cursor-not-allowed bg-border text-muted'
-                }`}
-              >
-                {exporting
-                  ? 'Exporting…'
-                  : selectedRows.length
-                  ? `Export ${selectedRows.length} question${selectedRows.length === 1 ? '' : 's'}`
-                  : 'Export'}
-              </button>
+              {/* Per-subtopic shortfall panel */}
+              {shortfalls.length > 0 && (
+                <ShortfallPanel shortfalls={shortfalls} />
+              )}
+
+              {numPapers > 1 && papers.length > 0 ? (
+                <>
+                  <div className="mt-4 space-y-1.5">
+                    {papers.map((p, i) => {
+                      const pSelected = p.filter((r) => !(paperExcluded[i] ?? new Set()).has(r.id))
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => onExport(i)}
+                          disabled={!pSelected.length || exporting}
+                          className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            pSelected.length && !exporting
+                              ? 'border-primary text-primary hover:bg-primary/10'
+                              : 'cursor-not-allowed border-border text-muted'
+                          }`}
+                        >
+                          {exporting ? 'Exporting…' : `Export Paper ${i + 1} (${pSelected.length}q)`}
+                        </button>
+                      )
+                    })}
+                    <button
+                      onClick={onExportAll}
+                      disabled={exporting || papers.every((p, i) => p.filter((r) => !(paperExcluded[i] ?? new Set()).has(r.id)).length === 0)}
+                      className={`mt-1 w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                        !exporting
+                          ? 'bg-primary text-white hover:bg-primary/90'
+                          : 'cursor-not-allowed bg-border text-muted'
+                      }`}
+                    >
+                      {exporting ? 'Exporting…' : `Export All ${papers.length} Papers`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  onClick={() => onExport()}
+                  disabled={!selectedRows.length || exporting}
+                  className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    selectedRows.length && !exporting
+                      ? 'bg-primary text-white hover:bg-primary/90'
+                      : 'cursor-not-allowed bg-border text-muted'
+                  }`}
+                >
+                  {exporting
+                    ? 'Exporting…'
+                    : selectedRows.length
+                    ? `Export ${selectedRows.length} question${selectedRows.length === 1 ? '' : 's'}`
+                    : 'Export'}
+                </button>
+              )}
 
               {toast && (
                 <p
@@ -989,7 +1175,7 @@ export default function QuestionPaperBuilder() {
                   {toast}
                 </p>
               )}
-              {savedPath && (
+              {savedPath && numPapers === 1 && (
                 <button
                   onClick={() => window.api.file.showInFolder(savedPath)}
                   className="mt-1 text-[11px] text-primary hover:underline"
@@ -1001,8 +1187,31 @@ export default function QuestionPaperBuilder() {
           </div>
 
           {/* ── Full-width preview ── */}
-          {rows.length > 0 && (
+          {papers.length > 0 && rows.length > 0 && (
             <div className="mt-6">
+              {/* Paper tabs — only shown when multiple papers were fetched */}
+              {numPapers > 1 && papers.length > 1 && (
+                <div className="mb-3 flex gap-1 border-b border-border pb-2">
+                  {papers.map((p, i) => {
+                    const pSel = p.filter((r) => !(paperExcluded[i] ?? new Set()).has(r.id))
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setActivePaper(i)}
+                        className={`rounded-t-md px-3 py-1.5 text-xs font-medium ${
+                          activePaper === i
+                            ? 'border border-b-bg border-border bg-surface text-text'
+                            : 'text-muted hover:text-text'
+                        }`}
+                      >
+                        Paper {i + 1}
+                        <span className="ml-1.5 text-[10px] text-muted">({pSel.length}q)</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <p className="text-xs text-muted">
                   {selectedRows.length} of {rows.length} selected

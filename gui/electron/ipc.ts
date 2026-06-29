@@ -18,10 +18,14 @@ import {
   type ExportRow,
 } from './export'
 import {
+  cancelDedup,
   cancelRun,
+  isDedupRunning,
   isRunning,
+  startDedup,
   startRun,
   startSupabasePush,
+  type DedupParams,
   type RunParams,
 } from './sidecar'
 import {
@@ -43,6 +47,7 @@ export function registerIpc(): void {
   )
   ipcMain.handle('db:typeDistribution', () => db.typeDistribution())
   ipcMain.handle('db:difficultyDistribution', () => db.difficultyDistribution())
+  ipcMain.handle('db:subtopicCounts', () => db.subtopicCounts())
   ipcMain.handle('db:costPerRun', (_e, limit?: number) => db.costPerRun(limit))
   // Dashboard sub-tabs 2–4 (§4.2)
   ipcMain.handle('db:criticCriteriaHeatmap', (_e, limit?: number) =>
@@ -97,6 +102,14 @@ export function registerIpc(): void {
     return result.filePath
   })
   ipcMain.handle('file:showInFolder', (_e, p: string) => shell.showItemInFolder(p))
+
+  ipcMain.handle('dedup:isRunning', () => isDedupRunning())
+  ipcMain.handle('dedup:start', (e, params: DedupParams) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) throw new Error('No window for this dedup request.')
+    startDedup(win, params)
+  })
+  ipcMain.handle('dedup:cancel', () => cancelDedup())
 
   ipcMain.handle('run:isRunning', () => isRunning())
   ipcMain.handle('run:start', (e, params: RunParams) => {

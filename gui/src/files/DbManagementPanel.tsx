@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type {
   DbHealth,
   DbStatus,
+  DedupEvent,
   FilterOptions,
   PushPreviewEvent,
   SupabasePushEvent,
@@ -31,12 +32,20 @@ export default function DbManagementPanel({
   const [runId, setRunId] = useState('')
   const [pushLog, setPushLog] = useState<string[]>([])
   const [pushing, setPushing] = useState(false)
-  // Holds the active push event-listener unsubscribe so we can tear it down on
-  // unmount (e.g. switching tabs mid-push) and never leak an ipcRenderer
-  // listener. The push subprocess itself keeps running and is reaped on window
-  // close (main.ts); it is short and the dedup gate makes a re-push safe.
   const unsubRef = useRef<(() => void) | null>(null)
   useEffect(() => () => unsubRef.current?.(), [])
+
+  // Dedup state
+  const [dedupThreshold, setDedupThreshold] = useState(95)
+  const [dedupIncludeSupabase, setDedupIncludeSupabase] = useState(false)
+  const [dedupLog, setDedupLog] = useState<string[]>([])
+  const [dedupRunning, setDedupRunning] = useState(false)
+  const [dedupResult, setDedupResult] = useState<{
+    total: number; clusters: number; would_drop: number;
+    sbClusters?: number; sbWouldDrop?: number
+  } | null>(null)
+  const dedupUnsubRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => dedupUnsubRef.current?.(), [])
 
   const loadStatus = () => window.api?.db.status().then(setStatus)
   useEffect(() => {
@@ -110,6 +119,66 @@ export default function DbManagementPanel({
     })
   }
 
+  const stopDedupListener = () => {
+    dedupUnsubRef.current?.()
+    dedupUnsubRef.current = null
+  }
+
+  const onDedup = (apply: boolean, applyCloud = false) => {
+    if (dedupRunning) return
+    setDedupRunning(true)
+    setDedupResult(null)
+    setDedupLog([apply ? 'Removing duplicates…' : 'Scanning for duplicates…'])
+    stopDedupListener()
+    dedupUnsubRef.current = window.api.dedup.onEvent((e: DedupEvent) => {
+      if (e.event === 'dedup_start') {
+        setDedupLog((l) => [...l, `Loaded ${e.total} questions · threshold ${e.threshold}%`])
+      } else if (e.event === 'dedup_scan_done') {
+        setDedupResult({ total: e.total, clusters: e.clusters, would_drop: e.would_drop })
+        if (e.clusters === 0) {
+          setDedupLog((l) => [...l, `Clean — no duplicates found in ${e.total} questions.`])
+        } else {
+          setDedupLog((l) => [
+            ...l,
+            `${e.clusters} cluster${e.clusters === 1 ? '' : 's'} · ${e.would_drop} duplicate${e.would_drop === 1 ? '' : 's'} found`,
+            ...e.cluster_details.slice(0, 5).map(
+              (c) => `  keep id=${c.keep_id}: ${c.keep_stem.slice(0, 70)}… (${c.drop_count} dup${c.drop_count === 1 ? '' : 's'})`
+            ),
+            ...(e.cluster_details.length > 5 ? [`  … and ${e.cluster_details.length - 5} more cluster(s)`] : []),
+          ])
+        }
+      } else if (e.event === 'dedup_apply_done') {
+        setDedupLog((l) => [...l, `Deleted ${e.deleted} duplicate(s). Backup: ${e.backup}`])
+        void loadStatus()
+      } else if (e.event === 'dedup_supabase_done') {
+        setDedupResult((r) => r ? { ...r, sbClusters: e.clusters, sbWouldDrop: e.would_drop } : r)
+        if (e.clusters === 0) {
+          setDedupLog((l) => [...l, `Supabase: clean (${e.total} questions checked).`])
+        } else {
+          setDedupLog((l) => [
+            ...l,
+            `Supabase: ${e.clusters} cluster(s) · ${e.would_drop} would drop` +
+              (e.deleted > 0 ? ` · deleted ${e.deleted}` : ''),
+          ])
+        }
+      } else if (e.event === 'dedup_supabase_error') {
+        setDedupLog((l) => [...l, `Supabase unavailable: ${e.message}`])
+      } else if (e.event === 'dedup_error') {
+        setDedupLog((l) => [...l, `Error: ${e.message}`])
+      } else if (e.event === 'dedup_process_exit') {
+        setDedupRunning(false)
+        stopDedupListener()
+      }
+    })
+    window.api.dedup
+      .start({ threshold: dedupThreshold, apply, applyCloud, includeSupabase: dedupIncludeSupabase })
+      .catch((err: unknown) => {
+        setDedupLog((l) => [...l, String(err)])
+        setDedupRunning(false)
+        stopDedupListener()
+      })
+  }
+
   return (
     <div className="border-t border-border">
       <button
@@ -121,7 +190,7 @@ export default function DbManagementPanel({
       </button>
 
       {open && (
-        <div className="grid grid-cols-1 gap-4 px-6 pb-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 px-6 pb-6 lg:grid-cols-2 xl:grid-cols-4">
           {/* SQLite status */}
           <div className="rounded-lg border border-border bg-surface p-4">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -226,6 +295,70 @@ export default function DbManagementPanel({
             {pushLog.length > 0 && (
               <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-bg p-2 text-[11px] text-muted">
                 {pushLog.join('\n')}
+              </pre>
+            )}
+          </div>
+
+          {/* Deduplication */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Deduplication
+            </h4>
+            <p className="mt-1 text-[11px] text-muted">
+              Detect near-duplicate questions using fuzzy similarity.
+            </p>
+
+            <div className="mt-3 flex items-center gap-2">
+              <label className="shrink-0 text-xs">Threshold</label>
+              <input
+                type="range"
+                min={80}
+                max={100}
+                value={dedupThreshold}
+                onChange={(e) => setDedupThreshold(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <span className="w-8 text-right text-xs tabular-nums">{dedupThreshold}%</span>
+            </div>
+
+            <label className="mt-2 flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={dedupIncludeSupabase}
+                onChange={(e) => setDedupIncludeSupabase(e.target.checked)}
+                className="accent-primary"
+              />
+              Include Supabase
+            </label>
+
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => onDedup(false)}
+                disabled={dedupRunning}
+                className="flex-1 rounded-md border border-border px-2 py-1 text-xs hover:border-primary disabled:opacity-50"
+              >
+                {dedupRunning ? 'Scanning…' : 'Scan'}
+              </button>
+              {dedupResult && dedupResult.would_drop > 0 && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(
+                      `Remove ${dedupResult.would_drop} duplicate${dedupResult.would_drop === 1 ? '' : 's'} from local DB? A backup will be created automatically.`
+                    )) {
+                      onDedup(true, dedupIncludeSupabase && (dedupResult.sbWouldDrop ?? 0) > 0)
+                    }
+                  }}
+                  disabled={dedupRunning}
+                  className="flex-1 rounded-md border border-danger/40 px-2 py-1 text-xs text-danger hover:bg-danger/10 disabled:opacity-50"
+                >
+                  Remove {dedupResult.would_drop}
+                </button>
+              )}
+            </div>
+
+            {dedupLog.length > 0 && (
+              <pre className="mt-2 max-h-36 overflow-y-auto whitespace-pre-wrap rounded bg-bg p-2 text-[11px] text-muted">
+                {dedupLog.join('\n')}
               </pre>
             )}
           </div>

@@ -1,9 +1,9 @@
 # ============================================================
 #  MCQ Agent — application configuration  (v0.7 production)
-#  Hybrid model setup — tested 2026-06-13:
-#    Analyzer  : google/gemini-2.5-pro   (richer concept maps; cached after 1st run)
-#    Generator : google/gemini-2.5-flash (best source grounding; bulk-friendly)
-#    Critic    : google/gemini-2.5-flash (reliable evaluation; fast)
+#  Model setup — updated 2026-06-29:
+#    Analyzer  : google/gemini-3.5-flash
+#    Generator : google/gemini-3.5-flash
+#    Critic    : google/gemini-3.5-flash
 # ============================================================
 
 # ---- Provider ---------------------------------------------------
@@ -11,18 +11,16 @@ provider: openrouter
 model: google/gemini-2.5-flash
 
 # ---- Per-stage model overrides ----------------------------------
-# Analyzer uses Pro for a richer ConceptMap (concepts, templates, confusion pairs).
-# The result is cached per source-file MD5 — Pro cost is incurred once per document.
-# Generator + Critic use Flash: better source grounding in our A/B tests, fast, cheap.
+# All stages currently use gemini-3.5-flash ($1.50 in / $9.00 out per 1M tokens).
 
 analyzer_provider: openrouter
-analyzer_model: google/gemini-2.5-pro
+analyzer_model: google/gemini-3.5-flash
 
 generator_provider: openrouter
-generator_model: google/gemini-2.5-flash
+generator_model: google/gemini-3.5-flash
 
 critic_provider: openrouter
-critic_model: google/gemini-2.5-flash
+critic_model: google/gemini-3.5-flash
 
 # ---- Question generation ----------------------------------------
 num_questions: 20
@@ -95,20 +93,19 @@ api_retry_initial_backoff: 2.0
 
 # ---- Pricing (USD per 1M tokens; cost reporting only) -----------
 # Verify current rates at https://openrouter.ai/models
-# pricing       → analyzer  (google/gemini-2.5-pro)
-# generator_pricing → generator (google/gemini-2.5-flash)
-# critic_pricing    → critic    (google/gemini-2.5-flash)
+# All three stages currently use google/gemini-3.5-flash.
+# Updated 2026-06-29: gemini-3.5-flash pricing = $1.50 in / $9.00 out per 1M tokens.
 pricing:
-  input_per_million_tokens: 1.25
-  output_per_million_tokens: 10.00
+  input_per_million_tokens: 1.50
+  output_per_million_tokens: 9.00
 
 generator_pricing:
-  input_per_million_tokens: 0.15
-  output_per_million_tokens: 0.60
+  input_per_million_tokens: 1.50
+  output_per_million_tokens: 9.00
 
 critic_pricing:
-  input_per_million_tokens: 0.15
-  output_per_million_tokens: 0.60
+  input_per_million_tokens: 1.50
+  output_per_million_tokens: 9.00
 
 # ---- Token compression (Headroom) ------------------------------
 # Compresses LLM input before every API call using headroom-ai.

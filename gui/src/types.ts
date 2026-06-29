@@ -113,6 +113,22 @@ export interface ProcessExitEvent {
   code: number | null
 }
 
+// --- Dedup events (scripts/dedup_db.py --json-events) ---
+export type DedupEvent =
+  | { event: 'dedup_start'; total: number; threshold: number }
+  | {
+      event: 'dedup_scan_done'
+      total: number
+      clusters: number
+      would_drop: number
+      cluster_details: { keep_id: number; keep_stem: string; drop_count: number; drop_ids: number[] }[]
+    }
+  | { event: 'dedup_apply_done'; deleted: number; backup: string }
+  | { event: 'dedup_supabase_done'; total: number; clusters: number; would_drop: number; deleted: number }
+  | { event: 'dedup_supabase_error'; message: string }
+  | { event: 'dedup_error'; message: string }
+  | { event: 'dedup_process_exit'; code: number | null }
+
 // --- DB row shapes (read from logs/runs.db; columns match the runs table) ---
 export interface RunRow {
   run_id: string
@@ -357,10 +373,26 @@ export interface PaperBucket {
   got: number
 }
 
+export interface SubTopicShortfall {
+  subTopic: string
+  difficulty: string
+  requested: number
+  got: number
+}
+
 export interface PaperQueryResult {
   rows: McqRow[]
   buckets: PaperBucket[]
+  subTopicShortfalls: SubTopicShortfall[]
   source: 'supabase' | 'sqlite'
+}
+
+export interface SubtopicCount {
+  tag: string
+  total: number
+  easy: number
+  medium: number
+  hard: number
 }
 
 // --- DB management panel (§5.7) ---

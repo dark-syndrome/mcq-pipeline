@@ -592,14 +592,15 @@ provider: openrouter           # anthropic | groq | openrouter
 model: google/gemini-2.5-flash
 
 # Per-stage model overrides. Use null to fall back to the global model above.
+# All three stages currently use google/gemini-3.5-flash ($1.50 in / $9.00 out per 1M).
 analyzer_provider: openrouter
-analyzer_model: google/gemini-2.5-pro       # premium; cached after first run
+analyzer_model: google/gemini-3.5-flash
 
 generator_provider: openrouter
-generator_model: google/gemini-2.5-flash
+generator_model: google/gemini-3.5-flash
 
 critic_provider: openrouter
-critic_model: google/gemini-2.5-flash
+critic_model: google/gemini-3.5-flash
 
 # ── Question Generation ────────────────────────────────────────────────────
 num_questions: 10              # target accepted questions per run
@@ -644,17 +645,29 @@ api_max_retries: 3
 api_retry_initial_backoff: 2.0
 
 # ── Pricing (cost reporting only — does not affect generation) ────────────
+# Verify current rates at https://openrouter.ai/models
+# Updated 2026-06-29: google/gemini-3.5-flash = $1.50 in / $9.00 out per 1M tokens.
 pricing:
-  input_per_million_tokens: 1.25
-  output_per_million_tokens: 10.00
+  input_per_million_tokens: 1.50
+  output_per_million_tokens: 9.00
 
 generator_pricing:
-  input_per_million_tokens: 0.15
-  output_per_million_tokens: 0.60
+  input_per_million_tokens: 1.50
+  output_per_million_tokens: 9.00
 
 critic_pricing:
-  input_per_million_tokens: 0.15
-  output_per_million_tokens: 0.60
+  input_per_million_tokens: 1.50
+  output_per_million_tokens: 9.00
+
+# ── Token compression (Headroom) ──────────────────────────────────────────
+# Compresses LLM input before every API call. Highest impact on Generator
+# calls (ConceptMap JSON + T2 prose). Reduces generator input tokens by ~50–70%.
+use_headroom: true
+
+# ── Per-Bloom generation mode ─────────────────────────────────────────────
+# false (default) = single batched Generator call at flat temperature.
+# true = one Generator call per active Bloom level, each at its bloom_temperatures value.
+enable_per_bloom_generation: false
 
 # ── Tagging ───────────────────────────────────────────────────────────────
 # topic_tag: null         # set a fixed tag; null → interactive CLI prompt
@@ -684,7 +697,9 @@ few_shot_examples_file: mcq_agent/prompts/few_shot_examples.json
 |---|---|
 | More questions | `num_questions: 50`; raise `guarantee_n_retries` |
 | Fewer grounding failures | Lower `source_grounding_threshold` to `0.50–0.60` |
-| Premium Analyzer only | `analyzer_model: anthropic/claude-opus-4-8` |
+| Premium Analyzer only | `analyzer_model: google/gemini-2.5-pro` |
+| Per-Bloom generation | `enable_per_bloom_generation: true` (~4–5× input tokens, richer diversity) |
+| Disable token compression | `use_headroom: false` |
 | Switch to Groq | Change all `*_provider` to `groq`, update model IDs |
 | Disable cloud sync | `enable_supabase: false` |
 | Stricter dedup | Lower `supabase_similarity_threshold` to `70` |
@@ -705,9 +720,11 @@ few_shot_examples_file: mcq_agent/prompts/few_shot_examples.json
 
 | Stage | Priority | Recommended |
 |---|---|---|
-| Analyzer | Quality > Cost — runs once, cached | `google/gemini-2.5-pro`, `claude-opus-4-8` |
-| Generator | Quality + instruction-following | `google/gemini-2.5-flash`, `claude-sonnet-4-6` |
-| Critic | Speed > Cost — runs once per MCQ | `google/gemini-2.5-flash`, `llama-3.1-8b-instant` |
+| Analyzer | Quality > Cost — runs once, cached | `google/gemini-3.5-flash` (current), `google/gemini-2.5-pro` (premium) |
+| Generator | Quality + instruction-following | `google/gemini-3.5-flash`, `claude-sonnet-4-6` |
+| Critic | Speed > Cost — runs once per MCQ | `google/gemini-3.5-flash`, `llama-3.1-8b-instant` |
+
+> **Current production config (2026-06-29):** All three stages use `google/gemini-3.5-flash` via OpenRouter at **$1.50 in / $9.00 out per 1M tokens**.
 
 ### Example: cost-optimised mixed config
 
@@ -716,7 +733,7 @@ provider: openrouter
 analyzer_provider: openrouter
 analyzer_model: google/gemini-2.5-pro       # premium once, then cached
 generator_provider: openrouter
-generator_model: google/gemini-2.5-flash
+generator_model: google/gemini-3.5-flash
 critic_provider: groq
 critic_model: llama-3.1-8b-instant          # fastest for per-MCQ eval
 ```
@@ -868,10 +885,32 @@ Purpose: a clean, deduplicated cloud question bank with gapless sequential numbe
 | Tab | What it does |
 |---|---|
 | **Model** | Graphical editor for `config.yaml` — 6 sections (provider, generation, quality, tokens, temperatures, linter). Profile save/load. Comment-preserving YAML writes. |
-| **Dashboard** | 4 sub-tabs: **Overview** (KPI strip + 4 charts), **Quality** (validator failures, reframer classes, Critic heatmap), **Cost & Tokens** (cumulative cost, cache-hit rate, token breakdown), **Run History** (sortable table + Inspect drawer). |
-| **Files** | Graphical query builder (difficulty · bloom · type · source · heading · date range). Card and table views. Export to **JSON / DOCX / PDF / XLSX**. **Question Paper Builder** — pick topics from the full tag catalog with per-topic difficulty ratios. DB management panel with Supabase push. |
-| **Run** | Upload `.md` → source quality card → run config (count, difficulty, type, **topic tags**) → live execution timeline → accepted question feed. Add **multiple topic tags** and the LLM assigns each question to the best-fit one. The run keeps streaming if you switch tabs and back (the tab stays mounted); cancel mid-run or it's reaped on window close. |
+| **Dashboard** | 4 sub-tabs: **Overview** (KPI strip + 4 charts + **Sub-topic Coverage panel**), **Quality** (validator failures, reframer classes, Critic heatmap, source linter stats), **Cost & Tokens** (cumulative cost, cache-hit rate, per-stage token breakdown), **Run History** (sortable table). |
+| **Files** | Graphical query builder (difficulty · bloom · type · source · heading · date range). Card and table views. Export to **JSON / DOCX / PDF / XLSX**. **Question Paper Builder** — allocate questions per subtopic with per-difficulty counts; shows **shortfall panel** for undertocked subtopics after fetch. DB management panel with Supabase push and local dedup. |
+| **Run** | Upload `.md` → source quality card → run config (count, difficulty, type, **subtopic tags**) → live execution timeline → accepted question feed. Multiple topic tags supported; the LLM assigns each question to the best-fit one. Tab stays mounted during navigation — switching tabs never interrupts a live run. |
 | **Eval Set** | Create named question sets (e.g. the archived bank). Browse & Annotate: 5-star rating, Correct/Wrong toggle, notes, source excerpt. Quality Summary panel. **Promote to few-shot** — push your top-rated, confirmed-correct questions into `few_shot_examples.json` to steer future generation. Import/export JSON. |
+
+### Dashboard — Sub-topic Coverage Panel
+
+The **Overview** sub-tab includes a dynamic Sub-topic Coverage panel at the bottom. It queries `topic_tags` vs the `mcqs` table on every dashboard load to show how many accepted questions exist for each registered subtopic, broken down by difficulty (Easy / Medium / Hard). 
+
+- **Status badges:** Green = "Good" (≥20 questions), Yellow = "Low" (<20), Red = "Empty" (0).
+- **Coverage bar:** Proportional fill relative to the highest-count subtopic.
+- **Attention strip:** Lists all subtopics below the 20-question threshold with a direct pointer to the Run tab.
+- **Dynamic:** As soon as a new `topic_tag` is added to the catalog and questions are generated, the panel shows the new row automatically — no config change needed.
+
+### Files — Question Paper Builder Shortfall Panel
+
+After fetching questions in the Paper Builder (subtopic allocation mode), if any subtopic/difficulty combination could not be fully filled, a **Shortfall Panel** appears below the question summary. It lists each gap — subtopic, difficulty, how many were requested vs available — so you know exactly which topics to run next to fill the paper. A footer link points to the Run tab.
+
+### Dashboard Sub-tabs in Detail
+
+| Sub-tab | Content |
+|---|---|
+| **Overview** | 6 KPI cards (total questions, accepted, rejected, acceptance rate, cost, avg cost/question) · Questions per generation chart · Type distribution donut · Cost per run bar chart · Difficulty distribution · Sub-topic Coverage panel |
+| **Quality** | Validator failure breakdown · Reframer class distribution · Critic criteria heatmap (pass rate per criterion per run) · Source linter stats (PASS/WARN/FAIL per check) |
+| **Cost & Tokens** | Cumulative cost curve with trend line · Analyzer cache hit rate · Per-stage token usage (analyzer/generator/critic/reframer in+out) · Cost per accepted question |
+| **Run History** | Full run log — generation number, timestamp, source file, generated/accepted/rejected counts, cost per run |
 
 ---
 
@@ -920,6 +959,7 @@ Purpose: a clean, deduplicated cloud question bank with gapless sequential numbe
 | `scripts/check_similarity.py` | Check a JSON file for near-duplicates vs local SQLite DB |
 | `scripts/migrate_to_supabase.py` | Push runs to Supabase; `--latest`, `--run-id`, `--dry-run` |
 | `scripts/archive_and_retag.py` | Re-tag untagged questions into the module tags via LLM, drop non-matches, archive survivors to an eval set, and consolidate the DB under one run. `--apply` gates DB mutation; backs up first. See [§17](#17-maintenance-archive--re-tag). |
+| `scripts/dedup_db.py` | Detect and remove near-duplicate questions from the local SQLite bank using `token_set_ratio`. Supports `--threshold`, `--apply` (dry-run by default), and `--include-supabase` to also deduplicate against the cloud bank. Emits NDJSON events for the GUI's DB Management dedup panel. |
 | `scripts/setup_venv.ps1` / `setup_venv.bat` | Windows helper — create `.venv`, install deps, run smoke tests |
 
 ---

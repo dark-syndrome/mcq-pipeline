@@ -26,6 +26,7 @@ import type {
   ReframerClassSlice,
   RunHistoryRow,
   SourceLinterStats,
+  SubtopicCount,
   TokenUsageByStage,
   TypeSlice,
   ValidatorFailure,
@@ -45,6 +46,7 @@ interface DashData {
   types: TypeSlice[]
   difficulties: DifficultySlice[]
   cost: CostPoint[]
+  subtopicCounts: SubtopicCount[]
   // Sub-tab 2 — Quality
   heatmap: CriticHeatmap
   validatorFailures: ValidatorFailure[]
@@ -81,19 +83,20 @@ export default function DashboardTab() {
       window.api.db.costPerAcceptedQuestion(),
       window.api.db.analyzerCacheHitRate(),
       window.api.db.runHistory(),
+      window.api.db.subtopicCounts(),
     ])
       .then(
         ([
           kpis, perGen, types, difficulties, cost,
           heatmap, validatorFailures, reframerClasses, linterStats,
           cumulativeCost, tokenUsage, costPerQuestion, cacheHitRate,
-          history,
+          history, subtopicCounts,
         ]) =>
           setData({
             kpis, perGen, types, difficulties, cost,
             heatmap, validatorFailures, reframerClasses, linterStats,
             cumulativeCost, tokenUsage, costPerQuestion, cacheHitRate,
-            history,
+            history, subtopicCounts,
           }),
       )
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -142,11 +145,14 @@ export default function DashboardTab() {
 
           {/* ── Sub-Tab 1: Overview ── */}
           {sub === 'overview' && (
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <QuestionsPerGenerationChart data={data.perGen} />
-              <TypeDistributionChart data={data.types} />
-              <CostPerRunChart data={data.cost} />
-              <DifficultyDistributionChart data={data.difficulties} />
+            <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <QuestionsPerGenerationChart data={data.perGen} />
+                <TypeDistributionChart data={data.types} />
+                <CostPerRunChart data={data.cost} />
+                <DifficultyDistributionChart data={data.difficulties} />
+              </div>
+              <SubtopicCoveragePanel data={data.subtopicCounts} />
             </div>
           )}
 
@@ -245,6 +251,136 @@ function LinterStatsTable({ data }: { data: SourceLinterStats }) {
             ))}
           </tbody>
         </table>
+      )}
+    </div>
+  )
+}
+
+function SubtopicCoveragePanel({ data }: { data: SubtopicCount[] }) {
+  if (data.length === 0) return null
+  const maxTotal = Math.max(...data.map((d) => d.total), 1)
+
+  function coverageColor(total: number): string {
+    if (total === 0) return COLORS.danger
+    if (total < 20) return COLORS.warning
+    return COLORS.success
+  }
+
+  function coverageLabel(total: number): string {
+    if (total === 0) return 'Empty'
+    if (total < 20) return 'Low'
+    return 'Good'
+  }
+
+  const needsAttention = data.filter((d) => d.total < 20)
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold">Sub-topic Coverage</h3>
+          <p className="mt-0.5 text-xs text-muted">
+            Accepted questions per sub-topic across all runs · hover rows for breakdown
+          </p>
+        </div>
+        {needsAttention.length > 0 && (
+          <span className="shrink-0 rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-medium text-warning">
+            {needsAttention.length} topic{needsAttention.length !== 1 ? 's' : ''} need more questions
+          </span>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="py-2 text-left font-medium text-muted">Sub-topic</th>
+              <th className="py-2 text-right font-medium text-muted">Total</th>
+              <th className="py-2 pr-2 text-right font-medium" style={{ color: COLORS.success }}>
+                Easy
+              </th>
+              <th className="py-2 pr-2 text-right font-medium" style={{ color: COLORS.warning }}>
+                Medium
+              </th>
+              <th className="py-2 pr-2 text-right font-medium" style={{ color: COLORS.danger }}>
+                Hard
+              </th>
+              <th className="w-40 py-2 text-left font-medium text-muted">Coverage</th>
+              <th className="py-2 text-center font-medium text-muted">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row) => {
+              const pct = Math.round((row.total / maxTotal) * 100)
+              const color = coverageColor(row.total)
+              return (
+                <tr
+                  key={row.tag}
+                  className="group border-b border-border/50 transition-colors hover:bg-primary/5"
+                >
+                  <td className="py-2 pr-3 font-mono text-xs">{row.tag}</td>
+                  <td
+                    className="py-2 text-right font-semibold tabular-nums"
+                    style={{ color }}
+                  >
+                    {row.total}
+                  </td>
+                  <td
+                    className="py-2 pr-2 text-right tabular-nums"
+                    style={{ color: row.easy > 0 ? COLORS.success : COLORS.muted }}
+                  >
+                    {row.easy || '—'}
+                  </td>
+                  <td
+                    className="py-2 pr-2 text-right tabular-nums"
+                    style={{ color: row.medium > 0 ? COLORS.warning : COLORS.muted }}
+                  >
+                    {row.medium || '—'}
+                  </td>
+                  <td
+                    className="py-2 pr-2 text-right tabular-nums"
+                    style={{ color: row.hard > 0 ? COLORS.danger : COLORS.muted }}
+                  >
+                    {row.hard || '—'}
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, background: color }}
+                      />
+                    </div>
+                  </td>
+                  <td className="py-2 text-center">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        color,
+                        background: `${color}18`,
+                      }}
+                    >
+                      {coverageLabel(row.total)}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {needsAttention.length > 0 && (
+        <div className="mt-3 rounded-lg border border-warning/30 bg-warning/8 px-3 py-2">
+          <p className="text-[11px] font-medium text-warning">
+            Topics needing generation:
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted">
+            {needsAttention.map((d) => `${d.tag} (${d.total})`).join(' · ')}
+          </p>
+          <p className="mt-1 text-[11px] text-muted">
+            Go to the Run tab → select these topics in Sub-topics to generate more questions.
+          </p>
+        </div>
       )}
     </div>
   )
