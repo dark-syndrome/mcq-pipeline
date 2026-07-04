@@ -44,7 +44,7 @@ An LLM-powered pipeline that transforms Markdown lesson files into production-qu
 Use this every time you return to the project after a break.
 
 ```
-[ ] 1. Open terminal in:  C:\Users\Akash\Documents\mcq_pipeline
+[ ] 1. Open terminal in:  C:\Users\Documents\mcq_pipeline
 
 [ ] 2. Activate Python environment:
         PowerShell:       .\.venv\Scripts\Activate.ps1
